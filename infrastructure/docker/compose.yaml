@@ -1,0 +1,19 @@
+name: filing-to-funding
+
+services:
+  postgres:
+    image: postgres:17.12
+    environment:
+      POSTGRES_DB: filing_to_funding
+      POSTGRES_USER: filing_to_funding
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
+    ports:
+      - "127.0.0.1:${FILING_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - ../../.local/docker-postgres:/var/lib/postgresql/data
+      - ../../database:/workspace/database:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "filing_to_funding", "-d", "filing_to_funding"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
