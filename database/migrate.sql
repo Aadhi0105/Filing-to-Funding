@@ -27,4 +27,13 @@ SELECT NOT EXISTS (
     INSERT INTO raw.schema_migrations (version) VALUES ('002_reviewed_sources');
 \endif
 
+SELECT NOT EXISTS (
+    SELECT 1 FROM raw.schema_migrations WHERE version = '003_pilot_analytics'
+) AS apply_pilot_analytics \gset
+
+\if :apply_pilot_analytics
+    \ir migrations/003_pilot_analytics.sql
+    INSERT INTO raw.schema_migrations (version) VALUES ('003_pilot_analytics');
+\endif
+
 COMMIT;
