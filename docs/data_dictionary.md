@@ -4,8 +4,8 @@ Pilot Task 3 establishes storage for the filing reconciliation and the next inge
 
 | Table | One row represents | Key and provenance |
 |---|---|---|
-| `raw.source_payloads` | An archived response body | SHA-256 of the original bytes, a storage key, and byte count. Repeated fetches can reference the same body. |
-| `raw.source_fetches` | A fetch of a source URL | Source type, URL, retrieval time, payload hash, and insertion time. |
+| `raw.source_payloads` | An archived response body or reviewed extract | SHA-256 of the archived bytes, a storage key, and byte count. Repeated fetches can reference the same body. |
+| `raw.source_fetches` | A fetch or reviewed extract associated with a source URL | Source type, URL, payload hash, and insertion time. Retrieval time is null for reviewed extracts. |
 | `core.issuers` | A reporting entity | The ten-character SEC CIK, including leading zeros. |
 | `core.issuer_aliases` | A ticker or legal name in use over an interval | CIK, alias kind, alias, inclusive start date, and optional exclusive end date. |
 | `core.reporting_periods` | An issuer's fiscal year or standalone fiscal quarter | CIK, fiscal year, optional quarter, and actual start and end dates. An annual period and its Q4 can share an end date. |
@@ -20,10 +20,10 @@ Pilot Task 3 establishes storage for the filing reconciliation and the next inge
 - A filing's reporting period is separate from each fact's period. A June 2025 10-Q can contain a comparative from January to June 2024. Both the filing accession and the comparative interval survive storage. An instant such as quarter-end cash has a null start date.
 - Filing date, acceptance instant, retrieval time, and database insertion time are separate. For the strict date-based historical view, use the filing date and require a verified acceptance instant before the next midnight in America/New_York. Missing acceptance time stays null and is excluded from this strict view. A fetch timestamp can show when the platform observed a disclosure. It cannot stand in for SEC acceptance.
 - Store XBRL numerical values as exact PostgreSQL `numeric` in source units. An amount displayed as 370,255 USD thousands is stored as 370255000 USD. Preserve decimals metadata where available. A genuinely reported zero is a value. Unavailable data has no qualifying numeric observation.
-- Preserve exact context dimensions as a JSON object and assign a scope key that differentiates changes in the businesses covered by a number. Scope and reporting basis must be checked when joining operands. Two distinct values for the same concept, period, unit, and context can coexist for investigation. An exact duplicate observation violates the unique constraint, including when its start date or precision is null. A source locator can be an inline XBRL fact ID or a JSON pointer. The ingestion task will validate that these references and any assigned scope match the filing evidence.
+- Preserve exact context dimensions as a JSON object and assign a scope key that differentiates changes in the businesses covered by a number. Scope and reporting basis must be checked when joining operands. Two distinct values for the same concept, period, unit, and context can coexist for investigation. An exact duplicate observation violates the unique constraint, including when its start date or precision is null. A source locator can be an inline XBRL fact ID or a JSON pointer. The pilot stores reviewed statement lines and their assigned reporting scopes.
 - Treasury values are percentages. A value of 4.125 represents 4.125%, and the observation date identifies the market date. Preserve different fetches for vintage review. Use a null publication timestamp when no exact time is available.
 
-The ingestion task will populate the model and record exceptions. Reporting-period mapping will check the actual dates and forms before writing. Where comparatives or conflicts require interpretation, the later analytics work will decide eligibility and retain the original evidence.
+The [source register](source_register.md) describes the imported sample, its provenance, and how to reproduce the load. The later analytics work will decide the eligibility of comparatives or conflicting values and retain the original evidence.
 
 ## Run locally
 
