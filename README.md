@@ -4,9 +4,9 @@
 
 Filing-to-Funding uses regulatory filings to show how companies' cash, debt, working capital, and operating cash flow change over time. It is designed for analysts who need to compare companies, check how a metric was calculated, and reconstruct what had been disclosed by a specific date.
 
-**Project status:** The v1.2 architecture is finalized. The pilot covers Illinois Tool Works, Dover, and Rockwell Automation. Sample figures have been checked against the filings, and the local PostgreSQL storage model has been built and tested. The next task is to load the pilot data.
+**Project status:** The v1.2 architecture is finalized. The pilot covers Illinois Tool Works, Dover, and Rockwell Automation. The local Docker PostgreSQL database contains 51 reviewed financial observations from seven SEC filings and 15 Treasury yields. Replaying the import added no rows. The next task is to verify calculations and historical views.
 
-[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md)
+[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md)
 
 ## What the application will do
 
@@ -77,8 +77,9 @@ The layout above includes planned components. Run and test the database with the
 1. **Select the pilot companies — complete.** The coverage matrix records the evidence and known comparison issues for Illinois Tool Works, Dover, and Rockwell Automation. Automated SEC tag coverage and the full filing and amendment inventory are still open.
 2. **Record expected values from the filings — complete.** The reconciliation records balance-sheet and cash-flow examples, including a later disclosure that changed the reporting scope.
 3. **Set up the local PostgreSQL model — complete.** Store fiscal periods, filing metadata, versioned financial observations, Treasury rates, and source references.
-4. **Load and verify the pilot data — next.** Load sample SEC and Treasury data and check that repeating an import creates no duplicates. Use the reconciled samples to test financial calculations and historical cutoffs after loading.
-5. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
-6. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
+4. **Load the pilot data — complete.** Import the reviewed SEC and Treasury extracts, preserve their source evidence, and verify that replay adds no duplicates. Automated retrieval remains open.
+5. **Verify calculations and historical cutoffs — next.** Reconcile derived financial metrics and test which filing facts are eligible at a selected cutoff.
+6. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
+7. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
 
 Financial verification will use independently checked SEC filing examples for real reporting cases and synthetic fixtures for edge cases. The test plan covers amendments, missing quarters, different fiscal calendars, incompatible reporting bases, and interrupted refreshes.

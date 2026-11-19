@@ -1,0 +1,277 @@
+{
+  "format": "ftf-reviewed-sec-v1",
+  "reviewed_on": "2026-11-19",
+  "issuers": {
+    "ITW": {"cik": "0000049826", "legal_name": "Illinois Tool Works Inc."},
+    "DOV": {"cik": "0000029905", "legal_name": "Dover Corporation"},
+    "ROK": {"cik": "0001024478", "legal_name": "Rockwell Automation, Inc."}
+  },
+  "filings": [
+    {
+      "ticker": "ITW",
+      "accession": "0000049826-26-000028",
+      "form_type": "10-Q",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/49826/000004982626000028/itw-20260331.htm",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/49826/000004982626000028/0000049826-26-000028-index.htm",
+      "filed_on": "2026-05-07",
+      "accepted_at": "2026-05-07T16:05:23-04:00",
+      "period": {"fiscal_year": 2026, "fiscal_quarter": 1, "starts_on": "2026-01-01", "ends_on": "2026-03-31"},
+      "usd_scale": 1000000,
+      "statements": [
+        {
+          "section": "Statement of Financial Position",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["cash_and_equivalents", "Cash and equivalents", 827],
+            ["current_assets", "Total current assets", 6335],
+            ["current_liabilities", "Total current liabilities", 5331],
+            ["short_term_debt", "Short-term debt", 2545],
+            ["noncurrent_debt", "Long-term debt", 6603]
+          ]
+        },
+        {
+          "section": "Statement of Cash Flows",
+          "starts_on": "2026-01-01",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["operating_cash_flow", "Net cash provided by operating activities", 623],
+            ["cash_capex_outflow", "Additions to plant and equipment", -95]
+          ]
+        }
+      ]
+    },
+    {
+      "ticker": "ITW",
+      "accession": "0000049826-26-000049",
+      "form_type": "10-Q",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/49826/000004982626000049/itw-20260630.htm",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/49826/000004982626000049/0000049826-26-000049-index.htm",
+      "filed_on": "2026-08-06",
+      "accepted_at": "2026-08-06T15:34:23-04:00",
+      "period": {"fiscal_year": 2026, "fiscal_quarter": 2, "starts_on": "2026-04-01", "ends_on": "2026-06-30"},
+      "usd_scale": 1000000,
+      "statements": [
+        {
+          "section": "Statement of Financial Position",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["cash_and_equivalents", "Cash and equivalents", 839],
+            ["current_assets", "Total current assets", 6600],
+            ["current_liabilities", "Total current liabilities", 5953],
+            ["short_term_debt", "Short-term debt", 3145],
+            ["noncurrent_debt", "Long-term debt", 6549]
+          ]
+        },
+        {
+          "section": "Statement of Cash Flows",
+          "starts_on": "2026-01-01",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["operating_cash_flow", "Net cash provided by operating activities", 1346],
+            ["cash_capex_outflow", "Additions to plant and equipment", -187]
+          ]
+        }
+      ]
+    },
+    {
+      "ticker": "DOV",
+      "accession": "0000029905-24-000035",
+      "form_type": "10-Q",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/29905/000002990524000035/dov-20240630.htm",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/29905/000002990524000035/0000029905-24-000035-index.htm",
+      "filed_on": "2024-07-25",
+      "accepted_at": "2024-07-25T06:39:50-04:00",
+      "period": {"fiscal_year": 2024, "fiscal_quarter": 2, "starts_on": "2024-04-01", "ends_on": "2024-06-30"},
+      "usd_scale": 1000,
+      "statements": [
+        {
+          "section": "Condensed Consolidated Balance Sheets",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["cash_and_equivalents", "Cash and cash equivalents", 328752],
+            ["current_assets", "Total current assets", 3265969],
+            ["current_liabilities", "Total current liabilities", 2134159],
+            ["short_term_debt", "Short-term borrowings", 210471],
+            ["noncurrent_debt", "Long-term debt", 2960914]
+          ]
+        },
+        {
+          "section": "Condensed Consolidated Statements of Cash Flows",
+          "starts_on": "2024-01-01",
+          "basis": "consolidated",
+          "scope": "esg_included",
+          "lines": [
+            ["operating_cash_flow", "Net cash provided by operating activities", 370255],
+            ["cash_capex_outflow", "Additions to property, plant and equipment", -85347]
+          ]
+        }
+      ]
+    },
+    {
+      "ticker": "DOV",
+      "accession": "0000029905-24-000045",
+      "form_type": "10-Q",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/29905/000002990524000045/dov-20240930.htm",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/29905/000002990524000045/0000029905-24-000045-index.html",
+      "filed_on": "2024-10-24",
+      "accepted_at": "2024-10-24T06:36:52-04:00",
+      "period": {"fiscal_year": 2024, "fiscal_quarter": 3, "starts_on": "2024-07-01", "ends_on": "2024-09-30"},
+      "usd_scale": 1000,
+      "statements": [
+        {
+          "section": "Condensed Consolidated Balance Sheets",
+          "basis": "consolidated",
+          "scope": "esg_held_for_sale",
+          "lines": [
+            ["cash_and_equivalents", "Cash and cash equivalents", 386766],
+            ["current_assets", "Total current assets", 3745901],
+            ["current_liabilities", "Total current liabilities", 2387203],
+            ["short_term_debt", "Short-term borrowings", 379295],
+            ["noncurrent_debt", "Long-term debt", 3007820]
+          ]
+        },
+        {
+          "section": "Condensed Consolidated Statements of Cash Flows",
+          "starts_on": "2024-01-01",
+          "basis": "continuing_operations",
+          "scope": "esg_excluded",
+          "lines": [
+            ["operating_cash_flow", "Net cash provided by operating activities", 648881],
+            ["cash_capex_outflow", "Additions to property, plant and equipment", -113626]
+          ]
+        },
+        {
+          "section": "Cash Flows from Discontinued Operations",
+          "starts_on": "2024-01-01",
+          "basis": "discontinued_operations",
+          "scope": "esg_discontinued",
+          "lines": [["operating_cash_flow", "Net cash provided by operating activities of discontinued operations", 108284]]
+        },
+        {
+          "section": "Cash-flow statement ending cash reconciliation",
+          "basis": "consolidated",
+          "scope": "esg_held_for_sale",
+          "lines": [
+            ["cash_held_for_sale", "Cash and cash equivalents held for sale", 10000],
+            ["cash_including_held_for_sale", "Cash and cash equivalents, including cash held for sale", 396766]
+          ]
+        }
+      ]
+    },
+    {
+      "ticker": "DOV",
+      "accession": "0000029905-25-000024",
+      "form_type": "10-Q",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/29905/000002990525000024/dov-20250630.htm",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/29905/000002990525000024/0000029905-25-000024-index.htm",
+      "filed_on": "2025-07-24",
+      "accepted_at": "2025-07-24T06:45:44-04:00",
+      "period": {"fiscal_year": 2025, "fiscal_quarter": 2, "starts_on": "2025-04-01", "ends_on": "2025-06-30"},
+      "usd_scale": 1000,
+      "statements": [
+        {
+          "section": "Condensed Consolidated Statements of Cash Flows, 2024 comparative column",
+          "starts_on": "2024-01-01",
+          "ends_on": "2024-06-30",
+          "basis": "continuing_operations",
+          "scope": "esg_excluded",
+          "lines": [
+            ["operating_cash_flow", "Net cash provided by operating activities", 295637],
+            ["cash_capex_outflow", "Additions to property, plant and equipment", -75872]
+          ]
+        },
+        {
+          "section": "Cash Flows from Discontinued Operations, 2024 comparative column",
+          "starts_on": "2024-01-01",
+          "ends_on": "2024-06-30",
+          "basis": "discontinued_operations",
+          "scope": "esg_discontinued",
+          "lines": [["operating_cash_flow", "Net cash provided by operating activities of discontinued operations", 74619]]
+        }
+      ]
+    },
+    {
+      "ticker": "ROK",
+      "accession": "0001024478-26-000030",
+      "form_type": "10-Q",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/1024478/000102447826000030/rok-20260630.htm",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/1024478/000102447826000030/0001024478-26-000030-index.htm",
+      "filed_on": "2026-08-04",
+      "accepted_at": "2026-08-04T14:03:44-04:00",
+      "period": {"fiscal_year": 2026, "fiscal_quarter": 3, "starts_on": "2026-04-01", "ends_on": "2026-06-30"},
+      "usd_scale": 1000000,
+      "statements": [
+        {
+          "section": "Consolidated Balance Sheet",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["cash_and_equivalents", "Cash and cash equivalents", 479],
+            ["current_assets", "Total current assets", 3948],
+            ["current_liabilities", "Total current liabilities", 3672],
+            ["short_term_debt", "Short-term debt", 686],
+            ["current_portion_long_term_debt", "Current portion of long-term debt", 2],
+            ["noncurrent_debt", "Long-term debt", 2570]
+          ]
+        },
+        {
+          "section": "Consolidated Statement of Cash Flows",
+          "starts_on": "2025-10-01",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["operating_cash_flow", "Cash provided by operating activities", 1278],
+            ["cash_capex_outflow", "Capital expenditures", -179]
+          ]
+        }
+      ]
+    },
+    {
+      "ticker": "ROK",
+      "accession": "0001024478-26-000048",
+      "form_type": "10-K",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/1024478/000102447826000048/rok-20260930.htm",
+      "filing_index_url": null,
+      "filed_on": "2026-11-12",
+      "accepted_at": null,
+      "period": {"fiscal_year": 2026, "fiscal_quarter": null, "starts_on": "2025-10-01", "ends_on": "2026-09-30"},
+      "usd_scale": 1000000,
+      "statements": [
+        {
+          "section": "Consolidated Balance Sheet",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["cash_and_equivalents", "Cash and cash equivalents", 433],
+            ["current_assets", "Total current assets", 3882],
+            ["current_liabilities", "Total current liabilities", 3768],
+            ["short_term_debt", "Short-term debt", 709],
+            ["current_portion_long_term_debt", "Current portion of long-term debt", 2],
+            ["noncurrent_debt", "Long-term debt", 2569]
+          ]
+        },
+        {
+          "section": "Consolidated Statement of Cash Flows",
+          "starts_on": "2025-10-01",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [
+            ["operating_cash_flow", "Cash provided by operating activities", 1958],
+            ["cash_capex_outflow", "Capital expenditures", -257]
+          ]
+        },
+        {
+          "section": "Lease maturity disclosure, Finance Leases column",
+          "basis": "consolidated",
+          "scope": "as_reported",
+          "lines": [["finance_lease_liabilities", "Total lease liabilities", 4]]
+        }
+      ]
+    }
+  ]
+}
