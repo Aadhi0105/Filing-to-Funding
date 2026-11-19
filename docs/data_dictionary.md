@@ -13,7 +13,7 @@ Pilot Task 3 establishes storage for the filing reconciliation and the next inge
 | `core.reported_facts` | A distinct numerical observation from a filing | Accession, taxonomy and concept, interval or instant, unit, dimensions, reporting basis, issuer-specific scope, source precision, value, and source fetch and locator. |
 | `core.treasury_yield_observations` | A published 2-, 5-, or 10-year nominal Treasury par yield as seen in a source fetch | Observation date, maturity in months, percent value, fetch, and publication timestamp when supported by source evidence. |
 
-`raw.schema_migrations` records the applied SQL versions. The `analytics` schema is reserved for the later calculations and historical views.
+`raw.schema_migrations` records the applied SQL versions. The `analytics` schema contains the [pilot calculation and historical-selection functions](financial_methodology.md).
 
 ## Dates, amounts, and repeated observations
 
@@ -23,7 +23,7 @@ Pilot Task 3 establishes storage for the filing reconciliation and the next inge
 - Preserve exact context dimensions as a JSON object and assign a scope key that differentiates changes in the businesses covered by a number. Scope and reporting basis must be checked when joining operands. Two distinct values for the same concept, period, unit, and context can coexist for investigation. An exact duplicate observation violates the unique constraint, including when its start date or precision is null. A source locator can be an inline XBRL fact ID or a JSON pointer. The pilot stores reviewed statement lines and their assigned reporting scopes.
 - Treasury values are percentages. A value of 4.125 represents 4.125%, and the observation date identifies the market date. Preserve different fetches for vintage review. Use a null publication timestamp when no exact time is available.
 
-The [source register](source_register.md) describes the imported sample, its provenance, and how to reproduce the load. The later analytics work will decide the eligibility of comparatives or conflicting values and retain the original evidence.
+The [source register](source_register.md) describes the imported sample, its provenance, and how to reproduce the load. The pilot analytics checks eligibility by period, filing date, and reporting scope while retaining the original evidence.
 
 ## Run locally
 
