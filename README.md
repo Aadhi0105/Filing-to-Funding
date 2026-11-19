@@ -4,9 +4,9 @@
 
 Filing-to-Funding uses regulatory filings to show how companies' cash, debt, working capital, and operating cash flow change over time. It is designed for analysts who need to compare companies, check how a metric was calculated, and reconstruct what had been disclosed by a specific date.
 
-**Project status:** The v1.2 architecture is finalized, and pilot Task 1 is complete. The pilot companies are Illinois Tool Works, Dover, and Rockwell Automation. Task 2 is to verify sample figures directly against the filings. The repository currently contains design and coverage documentation.
+**Project status:** The v1.2 architecture is finalized, and the first two pilot tasks are complete. The pilot covers Illinois Tool Works, Dover, and Rockwell Automation. Sample figures have been checked directly against the filings. The repository currently contains design, coverage, and reconciliation documentation.
 
-[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md)
+[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md)
 
 ## What the application will do
 
@@ -75,8 +75,8 @@ The directories above describe the v1.2 layout. Local run and test commands will
 ## Pilot and release roadmap
 
 1. **Select the pilot companies — complete.** The coverage matrix records the evidence and known comparison issues for Illinois Tool Works, Dover, and Rockwell Automation. Automated SEC tag coverage and the full filing and amendment inventory are still open.
-2. **Record expected values from the filings — next.** Check sample balance-sheet and cash-flow lines, including an ordinary year-to-date calculation and a change in reporting scope.
-3. **Build and test the local data pipeline.** Load the pilot data into PostgreSQL, verify that repeating an import creates no duplicates, reconcile calculations against the sample values, and test the historical cutoff against later disclosures.
+2. **Record expected values from the filings — complete.** The reconciliation records balance-sheet and cash-flow examples, including a later disclosure that changed the reporting scope.
+3. **Build and test the local data pipeline — next.** Start with the PostgreSQL storage model. Then load the pilot data, verify that repeating an import creates no duplicates, reconcile calculations against the sample values, and test the historical cutoff against later disclosures.
 4. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
 5. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
 
