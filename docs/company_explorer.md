@@ -1,6 +1,17 @@
 # Local Company Explorer
 
-The Phase 2 Explorer reads the three-company correctness dataset through a versioned FastAPI API and Next.js. It supports **Latest reported**, **Filed by date**, and **Platform snapshot** for the published local versions. Select an annual, quarterly, or trailing period, inspect the reported metrics and underlying SEC evidence, and export the selected period and free cash flow series.
+The local web app reads published snapshots through a versioned FastAPI API and Next.js. The active cohort release adds AOS, IEX, and LECO to DOV, ITW, and ROK. It supports **Latest reported**, **Filed by date**, and **Platform snapshot** for the published local versions. Select an annual, quarterly, or trailing period, inspect the reported metrics and underlying SEC evidence, and export the selected period and free cash flow series.
+
+
+| View | What to check |
+| --- | --- |
+| Overview | Latest fiscal quarter with an eligible filing for each issuer, key liquidity indicators, and a link to the calculation evidence. |
+| Company Explorer | Quarter, annual, and trailing values, source observations, and filing revisions. |
+| Peer Comparison | Free cash flow, working capital, or current ratio on a common reporting date. Flow values require aligned start dates and consolidated scope. Dover’s continuing-operations flows and Rockwell’s Sensia transition flows are withheld in affected comparisons. |
+| Funding Scenarios | 2Y, 5Y, and 10Y Treasury rates with observation age and vintage. Enter the exposure and shock to see the change in interest and sensitivity at ±50 basis points. A user-entered spread adds an illustrative coupon. |
+| Data Quality & Filing History | Publication checks, verified SEC filing dates and accessions, and the number of qualified facts by filing. An issuer may have an eligible filing for a period where a displayed metric remains unavailable. |
+
+AOS, IEX, and LECO each have 27 verified filing records. Qualified statement coverage for these issuers is limited to the samples documented in [cohort qualification](cohort_expansion.md). Some quarter and trailing calculations still lack compatible inputs. The app withholds borrowing ratios for these issuers while the lease basis is unverified. Archived datasets retain their original membership and methodology.
 
 ## Start locally
 

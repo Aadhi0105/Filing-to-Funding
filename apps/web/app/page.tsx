@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
-  AlertCircle, BarChart3, Building2, CalendarDays, ChevronDown, Database,
-  Download, ExternalLink, FileText, Landmark, Layers3,
+  AlertCircle, BarChart3, Building2, CalendarDays, ChevronDown,
+  Download, ExternalLink, FileText, Layers3,
 } from "lucide-react";
 import type { components } from "./api-types";
 import { FlowChart, fiscalLabel } from "./flow-chart";
+import { Workspace } from "./workspace";
 import { Button } from "../components/ui/button";
 
 type Model = components["schemas"];
@@ -210,25 +211,11 @@ export default function Explorer() {
   }
 
   return (
-    <div className="workspace">
-      <a className="skip" href="#main-content">Skip to content</a>
-      <aside className="sidebar" aria-label="Workspace navigation">
-        <a className="brand" href="#main-content">
-          <span className="brand-mark"><Landmark size={21} aria-hidden="true" /></span>
-          <span>Filing-to-Funding</span>
-        </a>
-        <nav>
-          <a className="nav-link nav-current" href="#main-content" aria-current="page"><BarChart3 size={18} />Company Explorer</a>
-          <a className="nav-link" href="#filing-evidence"><FileText size={18} />Filing evidence</a>
-        </nav>
-        <div className="sidebar-caption"><Database size={16} /><span>Local research workspace</span></div>
-      </aside>
-      <div className="right-pane">
-        <header className="topbar">
-          <span>Research workspace</span>
-          <span className="dataset-badge"><i />{active ? `Active dataset ${active.version}` : "Local dataset"}</span>
-        </header>
-        <main id="main-content" className="content">
+    <Workspace route="/" version={result?.context.dataset_version || active?.version}
+      query={controls.mode === "filed_by" && controls.filedBy
+        ? `?mode=filed_by&filed_by=${controls.filedBy}`
+        : controls.mode === "platform_snapshot" && (controls.version || active?.version)
+          ? `?mode=platform_snapshot&dataset_version=${controls.version || active?.version}` : undefined}>
           <header className="page-heading">
             <div><h1>Company Explorer</h1><p>Liquidity and cash flow from qualified SEC filings.</p></div>
             {result?.exportUrl && !loading && <Button asChild><a href={result.exportUrl}><Download size={16} /> Export CSV</a></Button>}
@@ -376,8 +363,6 @@ export default function Explorer() {
                 </tr>)}</tbody></table></div>}
             </section>
           </>}
-        </main>
-      </div>
-    </div>
+    </Workspace>
   );
 }

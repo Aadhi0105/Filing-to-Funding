@@ -14,6 +14,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from uuid import uuid4
 
+from pipelines import expand_cohort
 from pipelines.backfill_sec import CUTOFF, HISTORY_KIND, MANIFEST as SEC_MANIFEST
 from pipelines.load_pilot import ROOT, compose_psql
 from pipelines.qualify_sec import MANIFEST as STATEMENT_MANIFEST
@@ -32,6 +33,8 @@ IMPORTS = {
     "statements": ("pipelines.qualify_sec", "statements.jsonl"),
     "treasury": ("pipelines.treasury_history", "treasury.json"),
 }
+COHORT_FILENAME = "cohort.json"
+COHORT_CHECKS = ("sec_statement_conflicts", "cohort_expansion")
 COUNTS_SQL = """
 SELECT json_build_object(
     'issuers', (SELECT count(*) FROM core.issuers),
@@ -77,6 +80,8 @@ def methodology():
         *(ROOT / name for name in (
             "docs/sec_filing_inventory.csv", "pipelines/load_pilot.py", "pipelines/backfill_sec.py",
             "pipelines/qualify_sec.py", "pipelines/sec_http.py", "pipelines/treasury_history.py",
+            "pipelines/expand_cohort.py", "docs/cohort_expansion_filing_inventory.csv",
+            "testdata/cohort_expansion/statement_samples.csv",
         )),
     ]
     return {path.relative_to(ROOT).as_posix(): file_digest(path) for path in sorted(paths)}
@@ -85,7 +90,22 @@ def methodology():
 def capture_identity(captures):
     watermarks = {}
     inputs = {}
+    cohort = captures.get("cohort")
+    if cohort is not None:
+        bundle = json.loads(cohort)
+        expanded_hashes, expanded_watermarks = capture_identity({
+            "sec": canonical(bundle["sec"]),
+            "statements": b"\n".join(canonical(record) for record in bundle["statements"]),
+        })
+        if not expanded_watermarks:
+            raise ValueError("Missing cohort source watermarks")
+        inputs["cohort"] = digest({
+            **expanded_hashes, "samples_sha256": bundle["samples_sha256"],
+            "inventory_sha256": bundle["inventory_sha256"], "base_snapshot_id": bundle.get("base_snapshot_id"),
+        })
     for kind, content in captures.items():
+        if kind == "cohort":
+            continue
         records = (
             [json.loads(line) for line in content.splitlines() if line.strip()]
             if kind == "statements" else json.loads(content)
@@ -107,6 +127,10 @@ def capture_identity(captures):
                 "sha256": record["sha256"],
             }
         inputs[kind] = digest(sorted(records, key=canonical))
+    if cohort is not None:
+        if expanded_watermarks.keys() & watermarks.keys():
+            raise ValueError("Expanded and original source captures overlap")
+        watermarks.update(expanded_watermarks)
     return inputs, watermarks
 
 
@@ -187,15 +211,37 @@ def build_snapshot(stage, captures):
     database = "ftf_candidate_" + uuid4().hex
     run(tool_command("createdb", "--template=template0", database))
     try:
-        run(psql_command(database, "-f", "/workspace/database/migrate.sql"), stdout=subprocess.DEVNULL)
-        pilot = [sys.executable, "-B", "-m", "pipelines.load_pilot", "--",
-                 *tool_command("psql", "-d", database)]
-        run(pilot, stdout=subprocess.DEVNULL)
-        for module, filename in IMPORTS.values():
-            run([sys.executable, "-B", "-m", module, "--manifest", str(stage / filename), "--database", database],
-                stdout=subprocess.DEVNULL)
+        cohort = json.loads(captures["cohort"]) if "cohort" in captures else None
+        baseline_id = cohort.get("base_snapshot_id") if cohort else None
+        if baseline_id:
+            archive, baseline = snapshot_details(stage.parent.parent, baseline_id)
+            base_inputs, _ = capture_identity({name: captures[name] for name in IMPORTS})
+            sql_files = {name: checksum for name, checksum in methodology().items()
+                         if name.startswith("database/") and not name.startswith("database/tests/")}
+            base_sql = {name: checksum for name, checksum in baseline["methodology_files"].items()
+                        if name.startswith("database/") and not name.startswith("database/tests/")}
+            if (base_inputs != baseline["input_hashes"] or base_sql != sql_files
+                    or not set(CHECKS).issubset(baseline["validation_checks"])):
+                raise ValueError("The cohort baseline must have identical original inputs and database methodology")
+            restore_dump(archive, database)
+            if database_counts(database) != baseline["row_counts"]:
+                raise ValueError("Cohort baseline row counts do not match the archive")
+        else:
+            run(psql_command(database, "-f", "/workspace/database/migrate.sql"), stdout=subprocess.DEVNULL)
+            pilot = [sys.executable, "-B", "-m", "pipelines.load_pilot", "--",
+                     *tool_command("psql", "-d", database)]
+            run(pilot, stdout=subprocess.DEVNULL)
+            for module, filename in IMPORTS.values():
+                run([sys.executable, "-B", "-m", module, "--manifest", str(stage / filename), "--database", database],
+                    stdout=subprocess.DEVNULL)
         for check in CHECKS:
             run(psql_command(database, "-f", f"/workspace/database/tests/{check}.sql"), stdout=subprocess.DEVNULL)
+        if cohort is not None:
+            (stage / COHORT_FILENAME).write_bytes(captures["cohort"])
+            expand_cohort.load(cohort, database)
+            for check in COHORT_CHECKS:
+                run(psql_command(database, "-f", f"/workspace/database/tests/{check}.sql"),
+                    stdout=subprocess.DEVNULL)
         counts = database_counts(database)
         with (stage / "snapshot.dump").open("wb") as archive:
             run(tool_command("pg_dump", "--format=custom", "--no-owner", "--no-privileges", database),
@@ -215,6 +261,8 @@ def snapshot_details(directory, snapshot_id):
     folder = directory / "snapshots" / snapshot_id
     details = json.loads((folder / "snapshot.json").read_bytes())
     captures = {kind: (folder / filename).read_bytes() for kind, (_, filename) in IMPORTS.items()}
+    if "cohort" in details["input_hashes"]:
+        captures["cohort"] = (folder / COHORT_FILENAME).read_bytes()
     input_hashes, watermarks = capture_identity(captures)
     identity = {key: details[key] for key in (
         "format_version", "input_hashes", "methodology_sha256", "sec_filing_cutoff", "treasury_window",
@@ -274,7 +322,8 @@ def publish_locked(directory, manifests):
                 raise ValueError("Project methodology changed during the refresh")
             details = {
                 **identity, "snapshot_id": snapshot_id, "source_watermarks": watermarks,
-                "methodology_files": files, "row_counts": counts, "validation_checks": list(CHECKS),
+                "methodology_files": files, "row_counts": counts,
+                "validation_checks": list(dict.fromkeys(CHECKS + (COHORT_CHECKS if "cohort" in captures else ()))),
                 "dump_sha256": file_digest(stage / "snapshot.dump"),
             }
             write_json(stage / "snapshot.json", details)
@@ -291,6 +340,12 @@ def publish_locked(directory, manifests):
     return "published", record
 
 
+def restore_dump(folder, database):
+    with (folder / "snapshot.dump").open("rb") as archive:
+        run(tool_command("pg_restore", "--no-owner", "--no-privileges", "--single-transaction",
+                         "--exit-on-error", "-d", database), stdin=archive)
+
+
 def restore(directory, version, database):
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", database):
         raise ValueError("Use a new PostgreSQL database name made of lowercase letters, numbers, and underscores")
@@ -298,9 +353,7 @@ def restore(directory, version, database):
     folder, details = snapshot_details(directory, record["snapshot_id"])
     run(tool_command("createdb", "--template=template0", database))
     try:
-        with (folder / "snapshot.dump").open("rb") as archive:
-            run(tool_command("pg_restore", "--no-owner", "--no-privileges", "--single-transaction",
-                             "--exit-on-error", "-d", database), stdin=archive)
+        restore_dump(folder, database)
         if database_counts(database) != details["row_counts"]:
             raise ValueError("The restored dataset row counts do not match the published snapshot")
     except BaseException:
@@ -317,6 +370,7 @@ def main():
     refresh.add_argument("--sec-manifest", type=Path, default=SEC_MANIFEST)
     refresh.add_argument("--statement-manifest", type=Path, default=STATEMENT_MANIFEST)
     refresh.add_argument("--treasury-manifest", type=Path, default=TREASURY_MANIFEST)
+    refresh.add_argument("--cohort-manifest", type=Path)
     actions.add_parser("status", help="List published dataset versions and the active version")
     replay = actions.add_parser("restore", help="Restore an archived version into a new database")
     replay.add_argument("--version", help="Published version. Defaults to the active version.")
@@ -324,9 +378,12 @@ def main():
     args = parser.parse_args()
     directory = args.directory.resolve()
     if args.action == "publish":
-        status, record = publish(directory, {
+        manifests = {
             "sec": args.sec_manifest, "statements": args.statement_manifest, "treasury": args.treasury_manifest,
-        })
+        }
+        if args.cohort_manifest:
+            manifests["cohort"] = args.cohort_manifest
+        status, record = publish(directory, manifests)
         result = {"status": status, **record}
     elif args.action == "restore":
         result = restore(directory, args.version, args.database)

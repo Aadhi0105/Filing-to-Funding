@@ -60,12 +60,18 @@ def flow_scope(cik, period):
         return "consolidated", "itw_from_fifo_change" if year >= 2024 else "itw_before_fifo_change"
     if cik == "0001024478":
         return "consolidated", "rok_sensia_transition_year" if year >= 2026 else "rok_before_sensia_transition"
+    if cik in COHORT_SCOPES:
+        return "consolidated", COHORT_SCOPES[cik]
     if year == 2020:
         return "continuing_operations", "dov_2020_continuing_operations"
     if end >= date(2024, 9, 30):
         return "continuing_operations", "dov_excluding_esg"
     return "consolidated", "dov_including_esg"
 
+
+COHORT_SCOPES = {
+    "0000091142": "aos_reviewed", "0000832101": "iex_reviewed", "0000059527": "leco_reviewed",
+}
 
 FLOW_FN = {
     "annual": ("historical_annual_cash_flow", "period_start", "period_end"),

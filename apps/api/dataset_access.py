@@ -29,6 +29,8 @@ class Dataset:
     treasury_start: date
     treasury_end: date
     annual_and_revisions: bool
+    validation_checks: tuple[str, ...]
+    row_counts: dict[str, int]
 
     @property
     def database(self):
@@ -50,6 +52,7 @@ def catalog_datasets():
             date.fromisoformat(entry["sec_filing_cutoff"]), entry["published_at"],
             *map(date.fromisoformat, entry["treasury_window"]),
             "database/migrations/008_fiscal_period_metrics.sql" in details["methodology_files"],
+            tuple(details["validation_checks"]), details["row_counts"],
         ))
     return catalog["active_version"], datasets
 

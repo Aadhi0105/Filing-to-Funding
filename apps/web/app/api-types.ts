@@ -89,6 +89,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Portfolio Overview */
+        get: operations["portfolio_overview_api_v1_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/peers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Peer Comparison */
+        get: operations["peer_comparison_api_v1_peers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{cik}/filings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filings */
+        get: operations["filings_api_v1_companies__cik__filings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/funding/curve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Market Rates */
+        get: operations["market_rates_api_v1_funding_curve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/funding/scenario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Funding Scenario */
+        post: operations["funding_scenario_api_v1_funding_scenario_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -151,6 +236,51 @@ export interface components {
              */
             cutoff_timezone: string;
         };
+        /** Coupon */
+        Coupon: {
+            /** Reference Yield Percent */
+            reference_yield_percent: string;
+            /** Spread Bps */
+            spread_bps: string;
+            /** Baseline Coupon Percent */
+            baseline_coupon_percent: string;
+            /** Shocked Coupon Percent */
+            shocked_coupon_percent: string;
+            /** Baseline Interest Usd */
+            baseline_interest_usd: string;
+            /** Shocked Interest Usd */
+            shocked_interest_usd: string;
+        };
+        /** Curve */
+        Curve: {
+            /**
+             * Cutoff Date
+             * Format: date
+             */
+            cutoff_date: string;
+            /** Observation Date */
+            observation_date: string | null;
+            /** Observation Age Days */
+            observation_age_days: number | null;
+            /** Status */
+            status: string;
+            /** Vintage Status */
+            vintage_status: string | null;
+            /** Two Year Percent */
+            two_year_percent: string | null;
+            /** Five Year Percent */
+            five_year_percent: string | null;
+            /** Ten Year Percent */
+            ten_year_percent: string | null;
+            /** Ten Minus Two Bps */
+            ten_minus_two_bps: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Source Retrieved At */
+            source_retrieved_at: string | null;
+            /** Source Published At */
+            source_published_at: string | null;
+        };
         /** DatasetList */
         DatasetList: {
             /** Active Version */
@@ -188,6 +318,12 @@ export interface components {
             published_at: string;
             /** Annual And Revisions */
             annual_and_revisions: boolean;
+            /** Validation Checks */
+            validation_checks: string[];
+            /** Row Counts */
+            row_counts: {
+                [key: string]: number;
+            };
         };
         /** FilingFact */
         FilingFact: {
@@ -224,10 +360,55 @@ export interface components {
             /** Payload Sha256 */
             payload_sha256: string;
         };
+        /** FilingHistory */
+        FilingHistory: {
+            context: components["schemas"]["Context"];
+            company: components["schemas"]["Company"];
+            /** Total */
+            total: number;
+            /** With Qualified Facts */
+            with_qualified_facts: number;
+            /** Unverified Acceptance */
+            unverified_acceptance: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Filings */
+            filings: components["schemas"]["FilingRow"][];
+        };
+        /** FilingRow */
+        FilingRow: {
+            /** Accession */
+            accession: string;
+            /** Form Type */
+            form_type: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Filed On
+             * Format: date
+             */
+            filed_on: string;
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Filing Url */
+            filing_url: string;
+            /** Qualified Facts */
+            qualified_facts: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** MarketRates */
+        MarketRates: {
+            context: components["schemas"]["Context"];
+            curve: components["schemas"]["Curve"];
         };
         /** Metric */
         Metric: {
@@ -257,6 +438,51 @@ export interface components {
             denominator?: string | null;
             /** Debt Basis */
             debt_basis?: string | null;
+        };
+        /** Overview */
+        Overview: {
+            context: components["schemas"]["Context"];
+            /** Rows */
+            rows: components["schemas"]["OverviewRow"][];
+        };
+        /** OverviewRow */
+        OverviewRow: {
+            company: components["schemas"]["Company"];
+            period: components["schemas"]["Period"] | null;
+            /** Note */
+            note: string | null;
+            /** Metrics */
+            metrics: components["schemas"]["Metric"][];
+        };
+        /** PeerComparison */
+        PeerComparison: {
+            context: components["schemas"]["Context"];
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Duration
+             * @enum {string}
+             */
+            duration: "annual" | "quarter" | "ttm";
+            /** Metric */
+            metric: string;
+            /** Rows */
+            rows: components["schemas"]["PeerRow"][];
+        };
+        /** PeerRow */
+        PeerRow: {
+            company: components["schemas"]["Company"];
+            period: components["schemas"]["Period"] | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Reporting Basis */
+            reporting_basis: string | null;
+            metric: components["schemas"]["Metric"] | null;
+            /** Status */
+            status: string;
         };
         /** Period */
         Period: {
@@ -354,6 +580,62 @@ export interface components {
             prior_fact_ids: number[];
             /** Later Fact Ids */
             later_fact_ids: number[];
+        };
+        /** Scenario */
+        Scenario: {
+            context: components["schemas"]["Context"];
+            curve: components["schemas"]["Curve"] | null;
+            /** Reference Maturity */
+            reference_maturity: ("two_year" | "five_year" | "ten_year") | null;
+            /** Methodology Version */
+            methodology_version: string;
+            /** Currency */
+            currency: string;
+            /** Inputs */
+            inputs: {
+                [key: string]: string;
+            };
+            /** Repricing Principal Usd */
+            repricing_principal_usd: string;
+            /** Annual Shock Decimal */
+            annual_shock_decimal: string;
+            /** Incremental Interest Usd */
+            incremental_interest_usd: string;
+            illustrative_coupon: components["schemas"]["Coupon"] | null;
+            /** Formula */
+            formula: string;
+            /** Assumptions */
+            assumptions: string[];
+            /** Sensitivity */
+            sensitivity: components["schemas"]["SensitivityPoint"][];
+        };
+        /** ScenarioInputs */
+        ScenarioInputs: {
+            /** Principal Usd */
+            principal_usd: string;
+            /** Repricing Share */
+            repricing_share: string;
+            /** Shock Bps */
+            shock_bps: string;
+            /** Horizon Years */
+            horizon_years: string;
+            /** Spread Bps */
+            spread_bps?: string | null;
+            /**
+             * Maturity
+             * @default five_year
+             * @enum {string}
+             */
+            maturity: "two_year" | "five_year" | "ten_year";
+            /** Curve Date */
+            curve_date?: string | null;
+        };
+        /** SensitivityPoint */
+        SensitivityPoint: {
+            /** Shock Bps */
+            shock_bps: string;
+            /** Incremental Interest Usd */
+            incremental_interest_usd: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -533,6 +815,187 @@ export interface operations {
                 };
                 content: {
                     "text/csv": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_overview_api_v1_overview_get: {
+        parameters: {
+            query?: {
+                mode?: "latest" | "filed_by" | "platform_snapshot";
+                filed_by?: string | null;
+                dataset_version?: string | null;
+                expected_dataset_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Overview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    peer_comparison_api_v1_peers_get: {
+        parameters: {
+            query?: {
+                duration?: "annual" | "quarter" | "ttm";
+                metric?: "free_cash_flow" | "working_capital" | "current_ratio";
+                period_end?: string | null;
+                mode?: "latest" | "filed_by" | "platform_snapshot";
+                filed_by?: string | null;
+                dataset_version?: string | null;
+                expected_dataset_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    filings_api_v1_companies__cik__filings_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                mode?: "latest" | "filed_by" | "platform_snapshot";
+                filed_by?: string | null;
+                dataset_version?: string | null;
+                expected_dataset_version?: string | null;
+            };
+            header?: never;
+            path: {
+                cik: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilingHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    market_rates_api_v1_funding_curve_get: {
+        parameters: {
+            query?: {
+                curve_date?: string | null;
+                mode?: "latest" | "filed_by" | "platform_snapshot";
+                filed_by?: string | null;
+                dataset_version?: string | null;
+                expected_dataset_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketRates"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_scenario_api_v1_funding_scenario_post: {
+        parameters: {
+            query?: {
+                mode?: "latest" | "filed_by" | "platform_snapshot";
+                filed_by?: string | null;
+                dataset_version?: string | null;
+                expected_dataset_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioInputs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scenario"];
                 };
             };
             /** @description Validation Error */

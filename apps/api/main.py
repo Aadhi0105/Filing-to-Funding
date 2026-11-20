@@ -3,16 +3,17 @@
 import csv
 import io
 from datetime import date, datetime
-from decimal import Decimal
-from typing import Annotated
+from decimal import Context as DecimalContext, Decimal, localcontext
+from typing import Annotated, Literal
 
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, StringConstraints
 
-from apps.api import company_data as company
+from apps.api import company_data as company, research
 from apps.api.dataset_access import Duration, Mode, catalog_datasets, reader
+from apps.api.funding_scenario import CALCULATION_PRECISION, calculate_funding_scenario, decimal_string
 
 app = FastAPI(title="Filing-to-Funding API", version="1.0.0")
 API = "/api/v1"
@@ -28,6 +29,8 @@ class DatasetRecord(BaseModel):
     treasury_end: date
     published_at: datetime
     annual_and_revisions: bool
+    validation_checks: tuple[str, ...]
+    row_counts: dict[str, int]
 
 
 class DatasetList(BaseModel):
@@ -168,7 +171,7 @@ def selection(
     if selected is None:
         raise HTTPException(404, "Dataset version unavailable")
     if expected_dataset_version is not None and expected_dataset_version != selected.version:
-        raise HTTPException(409, "The selected dataset changed. Reload the Explorer to refresh its values.")
+        raise HTTPException(409, "The selected dataset changed. Reload this view to refresh its values.")
     if filed_by is not None and filed_by > selected.filing_cutoff:
         raise HTTPException(422, "The selected date is after the dataset's filing coverage")
     return selected, Context(
@@ -254,3 +257,192 @@ def export(result: Annotated[Analysis, Depends(analysis_request)]):
         output.getvalue(), media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{result.company.cik}-{context.dataset_version}.csv"'},
     )
+
+
+class OverviewRow(BaseModel):
+    company: Company
+    period: Period | None
+    note: str | None
+    metrics: list[Metric]
+
+
+class Overview(BaseModel):
+    context: Context
+    rows: list[OverviewRow]
+
+
+class PeerRow(BaseModel):
+    company: Company
+    period: Period | None
+    window_start: date | None
+    reporting_basis: str | None
+    metric: Metric | None
+    status: str
+
+
+class PeerComparison(BaseModel):
+    context: Context
+    period_end: date
+    duration: Duration
+    metric: str
+    rows: list[PeerRow]
+
+
+class FilingRow(BaseModel):
+    accession: str
+    form_type: str
+    period_end: date
+    filed_on: date
+    accepted_at: datetime | None
+    filing_url: str
+    qualified_facts: int
+
+
+class FilingHistory(BaseModel):
+    context: Context
+    company: Company
+    total: int
+    with_qualified_facts: int
+    unverified_acceptance: int
+    page: int
+    page_size: int
+    filings: list[FilingRow]
+
+
+class Curve(BaseModel):
+    cutoff_date: date
+    observation_date: date | None
+    observation_age_days: int | None
+    status: str
+    vintage_status: str | None
+    two_year_percent: Decimal | None
+    five_year_percent: Decimal | None
+    ten_year_percent: Decimal | None
+    ten_minus_two_bps: Decimal | None
+    source_url: str | None
+    source_retrieved_at: datetime | None
+    source_published_at: datetime | None
+
+
+class MarketRates(BaseModel):
+    context: Context
+    curve: Curve
+
+
+Maturity = Literal["two_year", "five_year", "ten_year"]
+ScenarioDecimal = Annotated[str, StringConstraints(min_length=1, max_length=128)]
+
+
+class ScenarioInputs(BaseModel):
+    principal_usd: ScenarioDecimal
+    repricing_share: ScenarioDecimal
+    shock_bps: ScenarioDecimal
+    horizon_years: ScenarioDecimal
+    spread_bps: ScenarioDecimal | None = None
+    maturity: Maturity = "five_year"
+    curve_date: date | None = None
+
+
+class Coupon(BaseModel):
+    reference_yield_percent: str
+    spread_bps: str
+    baseline_coupon_percent: str
+    shocked_coupon_percent: str
+    baseline_interest_usd: str
+    shocked_interest_usd: str
+
+
+class SensitivityPoint(BaseModel):
+    shock_bps: str
+    incremental_interest_usd: str
+
+
+class Scenario(BaseModel):
+    context: Context
+    curve: Curve | None
+    reference_maturity: Maturity | None
+    methodology_version: str
+    currency: str
+    inputs: dict[str, str]
+    repricing_principal_usd: str
+    annual_shock_decimal: str
+    incremental_interest_usd: str
+    illustrative_coupon: Coupon | None
+    formula: str
+    assumptions: list[str]
+    sensitivity: list[SensitivityPoint]
+
+
+@app.get(f"{API}/overview", response_model=Overview)
+def portfolio_overview(selected=Depends(selection)):
+    dataset, context = selected
+    with reader(dataset) as connection:
+        return {"context": context, "rows": research.overview(connection, dataset, context.filed_by)}
+
+
+@app.get(f"{API}/peers", response_model=PeerComparison)
+def peer_comparison(
+    duration: Duration = "quarter",
+    metric: Literal["free_cash_flow", "working_capital", "current_ratio"] = "free_cash_flow",
+    period_end: date | None = None,
+    selected=Depends(selection),
+):
+    dataset, context = selected
+    limit = context.filed_by or context.filing_cutoff
+    if period_end and period_end > limit:
+        raise HTTPException(422, "The comparison period ends after the selected cutoff")
+    with reader(dataset) as connection:
+        return {"context": context, "duration": duration, "metric": metric,
+                **research.peers(connection, dataset, context.filed_by, duration, period_end, metric)}
+
+
+@app.get(f"{API}/companies/{{cik}}/filings", response_model=FilingHistory)
+def filings(cik: CIK, page: Annotated[int, Query(ge=1, le=10000)] = 1, selected=Depends(selection)):
+    dataset, context = selected
+    with reader(dataset) as connection:
+        issuer = company.require_company(connection, cik, context.filed_by)
+        return {"context": context, "company": issuer,
+                **research.filing_history(connection, cik, context.filed_by, page)}
+
+
+@app.get(f"{API}/funding/curve", response_model=MarketRates)
+def market_rates(curve_date: date | None = None, selected=Depends(selection)):
+    dataset, context = selected
+    try:
+        cutoff = research.treasury_cutoff(context, curve_date)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    with reader(dataset) as connection:
+        return {"context": context, "curve": research.treasury_curve(connection, cutoff)}
+
+
+@app.post(f"{API}/funding/scenario", response_model=Scenario)
+def funding_scenario(inputs: ScenarioInputs, selected=Depends(selection)):
+    dataset, context = selected
+    curve = None
+    try:
+        cutoff = research.treasury_cutoff(context, inputs.curve_date)
+        if inputs.spread_bps is not None:
+            with reader(dataset) as connection:
+                curve = research.treasury_curve(connection, cutoff)
+            yield_percent = curve[f"{inputs.maturity}_percent"]
+            if yield_percent is None:
+                raise ValueError("No complete Treasury curve was available on the selected date.")
+        else:
+            yield_percent = None
+        result = calculate_funding_scenario(
+            principal_usd=inputs.principal_usd, repricing_share=inputs.repricing_share,
+            shock_bps=inputs.shock_bps, horizon_years=inputs.horizon_years,
+            reference_yield_percent=yield_percent, spread_bps=inputs.spread_bps,
+        )
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    with localcontext(DecimalContext(prec=CALCULATION_PRECISION)):
+        sensitivity = [
+            {"shock_bps": decimal_string(shock), "incremental_interest_usd": decimal_string(
+                result.repricing_principal_usd * shock / 10000 * result.horizon_years
+            )}
+            for shock in (result.shock_bps - 50, result.shock_bps, result.shock_bps + 50)
+        ]
+    return {"context": context, "curve": curve, "reference_maturity": inputs.maturity if curve else None,
+            "sensitivity": sensitivity, **result.to_dict()}

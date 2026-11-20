@@ -49,3 +49,20 @@ An invalid Treasury payload, an overlapping attempt, and an interruption during 
 ```sh
 python3 -B -m unittest discover -s pipelines/tests -v
 ```
+
+
+## Publish the reviewed expanded cohort
+
+Use the immutable archive of the validated three-company dataset as the base. Its exact SEC and Treasury inputs and database methodology are checked before reuse. The expanded manifest adds the new SEC captures, the base snapshot ID, and hashes of the reviewed inventory and samples. Publication repeats the baseline database checks and verifies the original XBRL observations, expected quarterly and annual values, and pre-filing exclusions before updating the catalog.
+
+```sh
+base_id=$(jq -r '.versions[] | select(.version == "v0003") | .snapshot_id' .local/datasets/catalog.json)
+base=".local/datasets/snapshots/$base_id"
+captures=".local/cohort-qualification/2026-11-19"
+python3 -B -m pipelines.expand_cohort "$captures" --base-snapshot-id "$base_id" > "$captures/cohort-derived.json"
+python3 -B -m pipelines.publish_dataset publish \
+  --sec-manifest "$base/sec.json" --statement-manifest "$base/statements.jsonl" \
+  --treasury-manifest "$base/treasury.json" --cohort-manifest "$captures/cohort-derived.json"
+```
+
+The cohort capture directory holds the SEC submissions and company-facts manifest in `sec.json` and the original sample filing manifest in `sample-statements.jsonl`. Their source archives must be available in the repository’s ignored `.local/source-cache` directory. The expanded statement history in this release covers only the checked sample facts. Run [web app preparation](company_explorer.md) after publishing.
