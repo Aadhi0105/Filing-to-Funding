@@ -8,7 +8,11 @@ DO $test$
 DECLARE
     failures text;
     candidate record;
+    rockwell_acceptance_known boolean;
 BEGIN
+    SELECT accepted_at IS NOT NULL INTO STRICT rockwell_acceptance_known
+    FROM core.filings WHERE accession = '0001024478-26-000048';
+
     WITH cases(label, cik, fiscal_year, quarter, fy_start, basis, scope, filed_by, cfo, capex, fcf, status) AS (
         VALUES
             ('ITW Q1', '0000049826', 2026, 1, DATE '2026-01-01', 'consolidated', 'as_reported',
@@ -28,9 +32,15 @@ BEGIN
              353244000, 37754000, 315490000, 'available'),
             ('Rockwell Q4 latest', '0001024478', 2026, 4, DATE '2025-10-01', 'consolidated', 'as_reported',
              NULL, 680000000, 78000000, 602000000, 'available'),
-            ('Rockwell Q4 without verified acceptance', '0001024478', 2026, 4, DATE '2025-10-01',
-             'consolidated', 'as_reported', DATE '2026-11-19',
+            ('Rockwell Q4 before filing', '0001024478', 2026, 4, DATE '2025-10-01',
+             'consolidated', 'as_reported', DATE '2026-11-11',
              NULL, NULL, NULL, 'missing_compatible_operands'),
+            ('Rockwell Q4 on filing day', '0001024478', 2026, 4, DATE '2025-10-01',
+             'consolidated', 'as_reported', DATE '2026-11-12',
+             CASE WHEN rockwell_acceptance_known THEN 680000000 END,
+             CASE WHEN rockwell_acceptance_known THEN 78000000 END,
+             CASE WHEN rockwell_acceptance_known THEN 602000000 END,
+             CASE WHEN rockwell_acceptance_known THEN 'available' ELSE 'missing_compatible_operands' END),
             ('Rockwell wrong fiscal start', '0001024478', 2026, 4, DATE '2026-01-01',
              'consolidated', 'as_reported', NULL, NULL, NULL, NULL, 'unsupported_fiscal_period')
     )

@@ -12,7 +12,7 @@
 
 All three are U.S. industrial registrants with consolidated U.S. GAAP financial statements in USD. They form a useful test cohort for common financial definitions. They span different industrial businesses, so peer comparisons should be descriptive and should show the actual reporting dates and business scope.
 
-The target inventory contains 23 base reports each for ITW and DOV and 20 for ROK, plus applicable amendments. These are expected counts from the reporting calendars, not measured API coverage. Each full fiscal year contributes three 10-Qs and one 10-K. Verify up to three predecessor fiscal quarters for opening trailing-twelve-month calculations. For ROK, 31 December 2025 is FY2026 Q1. September 2026 is Q3 for ITW and DOV and annual year-end for ROK. Compare compatible September balance-sheet balances on the same date. Align the duration before comparing flow metrics, such as by using four validated fiscal quarters.
+The EDGAR backfill confirms 23 base reports each for ITW and DOV, 20 for ROK, and one ITW amendment. Each full fiscal year contributes three 10-Qs and one 10-K. The backfill also captured the preceding fiscal year for each issuer to support opening trailing-twelve-month calculations. [Backfill and accession inventory](sec_backfill.md) For ROK, 31 December 2025 is FY2026 Q1. September 2026 is Q3 for ITW and DOV and annual year-end for ROK. Compare compatible September balance-sheet balances on the same date. Align the duration before comparing flow metrics, such as by using four validated fiscal quarters.
 
 ### Source links
 
@@ -41,6 +41,6 @@ The table records disclosure in the primary statements or notes. A disclosed lin
 
 ## Follow-up checks
 
-The SEC filings and issuer archives support this selection. Direct access to the SEC data API returned HTTP 403 in the Work environment. Automated Company Facts tag coverage, a complete accession and amendment inventory, and acceptance-time completeness remain open. Retrieve them through an approved SEC access path before claiming complete historical coverage. Use the filing and notes as the evidence for any missing or ambiguous standard tag. Record unresolved cases as unavailable or non-comparable. [SEC EDGAR API documentation](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)
+The backfill verified the accession inventory and acceptance times through SEC Submissions. Company Facts provides candidate USD observations. Use the original filing and notes as evidence for missing or ambiguous tags and record unresolved cases as unavailable or non-comparable. [Backfill accounting coverage](sec_backfill.md#accounting-coverage)
 
 For Task 2, start with ITW FY2026 Q1 and Q2 for a straightforward quarterly cash-flow check, DOV FY2024 Q2 and Q3 for the reporting-scope break, and ROK FY2026 Q3 and 10-K for the non-December fiscal year and debt treatment. Capture the report date, accession, statement line, currency and scale, and expected value directly from each filing.
