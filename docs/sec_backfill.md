@@ -52,4 +52,4 @@ The downloader sends the contact only to the SEC in the request header. It recor
 
 An independent download reproduced the 79-row inventory. Loading the frozen archive in a disposable PostgreSQL 17.12 database produced 79 filings and 2,273 candidate observations. A second import inserted zero rows and preserved the contents and IDs of the loaded tables. The reviewed pilot also replayed successfully after the backfill. An intentionally conflicting acceptance time caused the transaction to roll back. The original pilot checks and the historical import tests passed.
 
-The next correctness review covers issuer-specific tag and scope mappings, standalone quarter and trailing-period calculations, and historical results based on the expanded data.
+The [historical accounting qualification](historical_correctness.md) verifies the selected tags against the original statements and records when standalone quarters and trailing results are available.

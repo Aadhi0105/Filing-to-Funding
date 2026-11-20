@@ -13,7 +13,7 @@ Pilot Task 3 establishes storage for the filing reconciliation and the next inge
 | `core.reported_facts` | A distinct numerical observation from a filing | Accession, taxonomy and concept, interval or instant, unit, dimensions, reporting basis, issuer-specific scope, source precision, value, and source fetch and locator. |
 | `core.treasury_yield_observations` | A published 2-, 5-, or 10-year nominal Treasury par yield as seen in a source fetch | Observation date, maturity in months, percent value, fetch, and publication timestamp when supported by source evidence. |
 
-`raw.schema_migrations` records the applied SQL versions. The `analytics` schema contains the [pilot calculation and historical-selection functions](financial_methodology.md).
+`raw.schema_migrations` records the applied SQL versions. The `analytics` schema contains the [pilot calculation and historical-selection functions](financial_methodology.md) and the [qualified historical quarter and trailing calculations](historical_correctness.md#qualified-sql-results).
 
 ## Dates, amounts, and repeated observations
 
