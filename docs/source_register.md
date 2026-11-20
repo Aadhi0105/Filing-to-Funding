@@ -24,4 +24,36 @@ Python 3.11 and the existing PostgreSQL client are sufficient. The loader uses D
 
 The loader archives the input files under Git-ignored `.local/source-cache`, then inserts both sources in one database transaction. Existing accession metadata and issuer fiscal dates are checked before any conflicting input can commit. Replaying identical extracts preserves the existing IDs and insertion timestamps and adds no rows.
 
-The curated filing observations use the `filing-line` namespace. Their locators are JSON pointers to the exact displayed line in the archived extract. Store dollar amounts at their original displayed precision and retain the statement's sign for capex. The [pilot calculations](financial_methodology.md) normalize capex and apply reporting-scope and historical-eligibility rules. Automated SEC XBRL and Treasury XML retrieval, coverage outside these samples, and validation of historical yield vintages remain open.
+The curated filing observations use the `filing-line` namespace. Their locators are JSON pointers to the exact displayed line in the archived extract. Store dollar amounts at their original displayed precision and retain the statement's sign for capex. The [pilot calculations](financial_methodology.md) normalize capex and apply reporting-scope and historical-eligibility rules. The [original-source verification](#original-source-verification) extends this reviewed pilot with official source payloads.
+
+
+## Original-source verification
+
+On 20 November 2026, a clean PostgreSQL 17.12 test database reconciled the first official downloads with the pilot. The unmodified files are in the checkout's Git-ignored `.local/source-cache`. The verification transaction recorded each URL, UTC retrieval time, file length, and SHA-256. The working pilot database still serves the reviewed sample.
+
+| Source | Acquisition and scope | Retrieved at (UTC) | Bytes |
+|---|---|---|---:|
+| [SEC EDGAR accession directory](https://www.sec.gov/Archives/edgar/data/49826/000004982626000049/) | Browser download of `0000049826-26-000049-xbrl.zip`. The importer read `itw-20260630.htm` directly from the ZIP. Seven consolidated USD observations matched the reviewed ITW filing. | 2026-11-20 09:53:58.963 | 159,244 |
+| [Treasury October 2024 XML](https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value_month=202410) | HTTPS request returned HTTP 200. All 15 yields matched for 21–25 October at 2, 5 and 10 years. | 2026-11-20 09:50:53 | 25,643 |
+
+ITW's 30 June balance-sheet cash was $839M and first-half operating cash flow was $1.346B. The source reports $187M on the XBRL payments concept. The proof preserves that value and applies the opposite sign when comparing it to the reviewed statement's cash outflow. The [SEC filing index](https://www.sec.gov/Archives/edgar/data/49826/000004982626000049/0000049826-26-000049-index.htm) separately shows acceptance at 15:34:23 Eastern on 6 August 2026. That metadata already exists in the reviewed pilot. Treasury publication timestamps stay null because the XML's feed update time does not establish the observations' original publication times.
+
+The initial load inserted 2 payloads, 2 fetch records, 7 XBRL facts, and 15 yield observations. The archived replay inserted zero rows, with identical row contents and IDs. A simulated upstream error page was rejected, and replaying the valid archive recovered successfully. All three pilot SQL checks passed with the original-source rows present.
+
+### Replay the verified downloads
+
+Use a disposable PostgreSQL database with [the migrations](data_dictionary.md#reproduce-the-database-with-docker-compose) and the reviewed pilot already loaded. From this checkout, set `review_db` to its name and run the following:
+
+```sh
+python3 -m pipelines.verify_live_sources --database "$review_db" \
+  --sec-zip .local/source-cache/56a20366f2394c7f2a62bb99e213c6a1c510bdb874ca1134c01ce28b062d6040.zip \
+  --sec-retrieved-at '2026-11-20T09:53:58.963Z' \
+  --treasury-xml .local/source-cache/467d84757a00bbcfecdb20c9572f095efb9ee365922ecb497ecf187f61028455.xml \
+  --treasury-retrieved-at '2026-11-20T09:50:53Z'
+```
+
+For a new download, use the official URLs above and record the actual completion time with a UTC offset. The command verifies this fixed sample. It uses the existing reviewed filing metadata and stores the original XBRL observations with source locators. The pilot's published calculations still use the reviewed mapping.
+
+### Remaining source gate
+
+Command-line SEC requests returned HTTP 403 for the ZIP, extracted instance, index, and company concept endpoint during this check. An automated path that follows the [SEC's fair-access guidance](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data) is still needed for the three-company backfill. The single Treasury retrieval proves the sampled values and provenance. Historical Treasury vintages and recurring source availability still require verification.

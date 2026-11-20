@@ -22,12 +22,16 @@ def archive_review(filename, expected_format):
     if review["format"] != expected_format:
         raise ValueError(f"Unexpected source format in {filename}")
 
+    return review, archive_payload(content, "json")
+
+
+def archive_payload(content, extension):
     digest = hashlib.sha256(content).hexdigest()
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    archive = ARCHIVE_DIR / f"{digest}.json"
+    archive = ARCHIVE_DIR / f"{digest}.{extension}"
     if archive.exists():
         if archive.read_bytes() != content:
-            raise ValueError(f"Archived review does not match its digest: {archive.name}")
+            raise ValueError(f"Archived payload does not match its digest: {archive.name}")
     else:
         with NamedTemporaryFile(dir=ARCHIVE_DIR, delete=False) as handle:
             temporary = Path(handle.name)
@@ -38,7 +42,7 @@ def archive_review(filename, expected_format):
             finally:
                 temporary.unlink(missing_ok=True)
 
-    return review, {
+    return {
         "sha256": digest,
         "storage_key": archive.relative_to(ROOT).as_posix(),
         "byte_count": len(content),
