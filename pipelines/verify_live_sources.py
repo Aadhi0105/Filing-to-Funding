@@ -13,6 +13,7 @@ from xml.etree import ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
 from pipelines.load_pilot import REVIEW_DIR, ROOT, archive_payload, compose_psql
+from pipelines.treasury_history import treasury_curves
 
 CIK = "0000049826"
 ACCESSION = "0000049826-26-000049"
@@ -27,12 +28,7 @@ HALF_START = "2026-01-01"
 MAX_BYTES = 8 * 1024 * 1024
 IX = "{http://www.xbrl.org/2013/inlineXBRL}"
 XBRL = "http://www.xbrl.org/2003/instance"
-XML_NS = {
-    "x": XBRL,
-    "a": "http://www.w3.org/2005/Atom",
-    "d": "http://schemas.microsoft.com/ado/2007/08/dataservices",
-    "m": "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
-}
+XML_NS = {"x": XBRL}
 # XBRL's payments concept is positive for an outflow. The reviewed statement uses a cash-flow sign.
 SEC_FACTS = (
     ("CashAndCashEquivalentsAtCarryingValue", "cash_and_equivalents", None, 1),
@@ -43,7 +39,6 @@ SEC_FACTS = (
     ("NetCashProvidedByUsedInOperatingActivities", "operating_cash_flow", HALF_START, 1),
     ("PaymentsToAcquirePropertyPlantAndEquipment", "cash_capex_outflow", HALF_START, -1),
 )
-TREASURY_FIELDS = {24: "BC_2YEAR", 60: "BC_5YEAR", 120: "BC_10YEAR"}
 
 
 def read_response(filename):
@@ -128,26 +123,15 @@ def itw_facts(payload):
 
 
 def treasury_rates(payload):
-    root = ET.fromstring(payload)
-    if root.tag != f"{{{XML_NS['a']}}}feed":
-        raise ValueError("Expected the Treasury Atom XML feed")
     review = json.loads((REVIEW_DIR / "treasury_pilot.json").read_bytes())
     sample_dates = {row[0] for row in review["rows"]}
-    seen = set()
-    for row in root.findall("a:entry/a:content/m:properties", XML_NS):
-        observed_on = datetime.fromisoformat(row.findtext("d:NEW_DATE", namespaces=XML_NS)).date().isoformat()
-        if observed_on not in sample_dates:
-            continue
-        if observed_on in seen:
-            raise ValueError(f"Treasury feed repeated {observed_on}")
-        seen.add(observed_on)
-        for maturity, field in TREASURY_FIELDS.items():
-            value = Decimal(row.findtext(f"d:{field}", namespaces=XML_NS))
-            if not value.is_finite():
-                raise ValueError(f"Missing Treasury yield for {observed_on} / {maturity} months")
-            yield {"observation_date": observed_on, "maturity_months": maturity, "yield_percent": str(value)}
-    if seen != sample_dates:
-        raise ValueError(f"Treasury feed missing dates: {', '.join(sorted(sample_dates - seen))}")
+    curves = {day.isoformat(): rates for day, rates in treasury_curves(payload).items()}
+    missing = sample_dates - curves.keys()
+    if missing:
+        raise ValueError(f"Treasury feed missing dates: {', '.join(sorted(missing))}")
+    for day in sorted(sample_dates):
+        for maturity, value in curves[day].items():
+            yield {"observation_date": day, "maturity_months": maturity, "yield_percent": str(value)}
 
 
 def retrieval_time(value):
