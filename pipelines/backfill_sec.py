@@ -10,7 +10,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -18,12 +17,15 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from pipelines.load_pilot import ROOT, archive_payload, compose_psql
+from pipelines.sec_http import download_edgar, sec_contact
 
 CUTOFF = date(2026, 11, 19)
 SEC_API = "https://data.sec.gov"
 SEC_ARCHIVES = "https://www.sec.gov/Archives/edgar/data"
 MANIFEST = ROOT / ".local/sec-history-2026-11-19.json"
 MAX_BYTES = 24 * 1024 * 1024
+HISTORY_KIND = "sec_submissions_history"
+FILING_COLUMNS = ("accessionNumber", "form", "reportDate", "filingDate", "acceptanceDateTime", "primaryDocument")
 ISSUERS = (
     ("0000049826", "ITW", "Illinois Tool Works Inc.", 12, 2021),
     ("0000029905", "DOV", "Dover Corporation", 12, 2021),
@@ -116,44 +118,38 @@ def capture(cik, kind, url, retrieved_at, content):
     }
 
 
-def sec_contact():
-    contact = os.environ.get("SEC_CONTACT_EMAIL", "")
-    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", contact):
-        raise ValueError("Set SEC_CONTACT_EMAIL to an authorized project contact for EDGAR requests")
-    return contact
-
-
-class EdgarDownloadError(ValueError):
-    def __init__(self, url, status):
-        self.status = status
-        super().__init__(f"EDGAR download failed for {url} (HTTP {status or 'unavailable'})")
-
-
-def download_edgar(url, contact, max_bytes):
-    if not url.startswith(("https://data.sec.gov/", "https://www.sec.gov/Archives/edgar/data/")):
-        raise ValueError("EDGAR downloads require an official SEC source URL")
-    with NamedTemporaryFile() as response:
-        request = subprocess.run([
-            "curl", "--disable", "--silent", "--show-error", "--fail",
-            "--retry", "1", "--retry-delay", "2", "--retry-max-time", "50", "--max-time", "35",
-            "--max-filesize", str(max_bytes),
-            "--user-agent", f"Filing-to-Funding {contact}", "--output", response.name,
-            "--write-out", "%{http_code}", url,
-        ], capture_output=True, text=True)
-        if request.returncode:
-            raise EdgarDownloadError(url, request.stdout)
-        return Path(response.name).read_bytes(), datetime.now(timezone.utc).isoformat()
+def overlapping_shards(cik, submissions, first_end):
+    shards = {}
+    for descriptor in submissions["filings"]["files"]:
+        name = descriptor["name"]
+        if not re.fullmatch(rf"CIK{cik}-submissions-[0-9]+\.json", name):
+            raise ValueError(f"Invalid EDGAR historical submissions filename for {cik}")
+        start = date.fromisoformat(descriptor["filingFrom"])
+        end = date.fromisoformat(descriptor["filingTo"])
+        url = f"{SEC_API}/submissions/{name}"
+        if start > end or url in shards:
+            raise ValueError(f"Invalid or duplicate EDGAR historical submissions range for {name}")
+        shards[url] = (start, end)
+    return {url: bounds for url, bounds in sorted(shards.items())
+            if bounds[0] <= CUTOFF and bounds[1] >= date.fromisoformat(first_end)}
 
 
 def download_capture():
     contact = sec_contact()
     archives = []
-    for cik, *_ in ISSUERS:
-        for kind in ("sec_submissions", "sec_company_facts"):
-            url = endpoint(cik, kind)
-            content, fetched = download_edgar(url, contact, MAX_BYTES)
-            archives.append(capture(cik, kind, url, fetched, content))
-            time.sleep(0.5)
+    for cik, _, _, year_end, first_year in ISSUERS:
+        url = endpoint(cik, "sec_submissions")
+        content, fetched = download_edgar(url, contact, MAX_BYTES)
+        submissions = json.loads(content)
+        if str(submissions["cik"]).zfill(10) != cik:
+            raise ValueError(f"EDGAR capture has the wrong CIK for {cik}")
+        archives.append(capture(cik, "sec_submissions", url, fetched, content))
+        for history_url in overlapping_shards(cik, submissions, min(periods(year_end, first_year))):
+            content, fetched = download_edgar(history_url, contact, MAX_BYTES)
+            archives.append(capture(cik, HISTORY_KIND, history_url, fetched, content))
+        url = endpoint(cik, "sec_company_facts")
+        content, fetched = download_edgar(url, contact, MAX_BYTES)
+        archives.append(capture(cik, "sec_company_facts", url, fetched, content))
     return archives
 
 
@@ -170,32 +166,49 @@ def read_archive(source):
     return json.loads(content, parse_float=Decimal)
 
 
-def filing_rows(cik, document, expected):
-    recent = document["filings"]["recent"]
-    first_end = min(expected)
-    # A future capture may move these filings into an older shard. Fail explicitly if the main
-    # response no longer proves coverage of the fixed window, instead of claiming missing filings.
-    if any(first_end <= item["filingTo"] and item["filingFrom"] <= CUTOFF.isoformat()
-           for item in document["filings"]["files"]):
-        raise ValueError(f"{cik} has a historical submissions shard overlapping the backfill window")
-    fields = ("accessionNumber", "form", "reportDate", "filingDate", "acceptanceDateTime", "primaryDocument")
+def filing_rows(cik, document, expected, history=()):
+    first_end, last_end = min(expected), max(expected)
+    captures = [(endpoint(cik, "sec_submissions"), document["filings"]["recent"], None), *history]
+    by_accession = defaultdict(list)
+    in_window = set()
+    for url, columns, bounds in captures:
+        if any(not isinstance(columns[field], list) for field in FILING_COLUMNS):
+            raise ValueError(f"Expected EDGAR filing columns in {url}")
+        for accession, form, end, filed, accepted, primary in zip(
+            *(columns[field] for field in FILING_COLUMNS), strict=True
+        ):
+            filed_date = date.fromisoformat(filed) if bounds or form in FORMS else None
+            if bounds and not bounds[0] <= filed_date <= bounds[1]:
+                raise ValueError(f"EDGAR filing date outside advertised history range for {url}")
+            if form in FORMS and filed_date <= CUTOFF:
+                if not end and filed >= first_end:
+                    raise ValueError(f"Report date missing for {accession}")
+                if first_end <= end <= last_end:
+                    in_window.add(accession)
+            by_accession[accession].append(((form, end, filed, primary), accepted, url))
+
     rows = {}
-    for accession, form, end, filed, accepted, primary in zip(*(recent[field] for field in fields), strict=True):
-        if form not in FORMS or date.fromisoformat(filed) > CUTOFF:
+    for accession, observations in by_accession.items():
+        if accession not in in_window:
             continue
-        if not end and filed >= first_end:
-            raise ValueError(f"Report date missing for {accession}")
-        if not first_end <= end <= max(expected):
-            continue
+        fields, accepted, url = observations[0]
+        timestamp = utc_timestamp(accepted)
+        for other, other_accepted, other_url in observations[1:]:
+            other_timestamp = utc_timestamp(other_accepted)
+            if fields != other or (timestamp and other_timestamp and timestamp != other_timestamp):
+                raise ValueError(f"Conflicting EDGAR submissions metadata for {accession}")
+            if not timestamp and other_timestamp:
+                timestamp, url = other_timestamp, other_url
+        form, end, filed, primary = fields
         if end not in expected or expected[end]["form_type"] != form.removesuffix("/A"):
             raise ValueError(f"Unexpected fiscal period or form for {accession}")
-        if not re.fullmatch(r"[0-9]{10}-[0-9]{2}-[0-9]{6}", accession) or accession in rows:
-            raise ValueError(f"Invalid or duplicate SEC accession: {accession}")
+        if not re.fullmatch(r"[0-9]{10}-[0-9]{2}-[0-9]{6}", accession):
+            raise ValueError(f"Invalid SEC accession: {accession}")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.html?", primary) or filed < end:
             raise ValueError(f"Unexpected filing document or date for {accession}")
         rows[accession] = {
             **expected[end], "accession": accession, "form_type": form, "filed_on": filed,
-            "accepted_at": utc_timestamp(accepted), "primary_document": primary,
+            "accepted_at": timestamp, "primary_document": primary, "metadata_source_url": url,
             "filing_url": f"{SEC_ARCHIVES}/{int(cik)}/{accession.replace('-', '')}/{primary}",
         }
     return rows
@@ -226,31 +239,42 @@ def financial_facts(document, filings, first_end):
 
 
 def build_batch(sources):
-    by_source = {(source["cik"], source["source_kind"]): source for source in sources}
-    required = {(cik, kind) for cik, *_ in ISSUERS for kind in ("sec_submissions", "sec_company_facts")}
-    if len(sources) != len(required) or by_source.keys() != required:
-        raise ValueError("Expected one Submissions and one Company Facts capture for each pilot issuer")
+    by_url = {source["source_url"]: source for source in sources}
+    if len(by_url) != len(sources):
+        raise ValueError("Duplicate EDGAR source URL in the capture")
+
+    def read_source(cik, kind, url):
+        if url not in by_url:
+            raise ValueError(f"Missing required EDGAR source capture for {url}")
+        source = by_url.pop(url)
+        if (source["cik"], source["source_kind"]) != (cik, kind):
+            raise ValueError(f"Unexpected EDGAR source identity for {url}")
+        return source, read_archive(source)
 
     batch = []
     for cik, ticker, legal_name, year_end, first_year in ISSUERS:
-        metadata = by_source[cik, "sec_submissions"]
-        facts_source = by_source[cik, "sec_company_facts"]
-        for source in (metadata, facts_source):
-            if source["source_url"] != endpoint(cik, source["source_kind"]):
-                raise ValueError(f"Unexpected EDGAR source URL for {ticker}")
-        submissions, company_facts = read_archive(metadata), read_archive(facts_source)
+        metadata, submissions = read_source(cik, "sec_submissions", endpoint(cik, "sec_submissions"))
+        facts_source, company_facts = read_source(cik, "sec_company_facts", endpoint(cik, "sec_company_facts"))
         if str(submissions["cik"]).zfill(10) != cik or str(company_facts["cik"]).zfill(10) != cik:
             raise ValueError(f"EDGAR capture has the wrong CIK for {ticker}")
         if submissions["fiscalYearEnd"] != {12: "1231", 9: "0930"}[year_end]:
             raise ValueError(f"EDGAR's fiscal year-end changed for {ticker}")
         expected = periods(year_end, first_year)
-        inventory = filing_rows(cik, submissions, expected)
+        history = []
+        archived = [metadata, facts_source]
+        for url, bounds in overlapping_shards(cik, submissions, min(expected)).items():
+            source, columns = read_source(cik, HISTORY_KIND, url)
+            history.append((url, columns, bounds))
+            archived.append(source)
+        inventory = filing_rows(cik, submissions, expected, history)
         observations = list(financial_facts(company_facts, inventory, min(expected)))
         batch.append({
             "cik": cik, "ticker": ticker, "legal_name": legal_name,
-            "sources": [metadata, facts_source], "periods": list(expected.values()),
+            "sources": archived, "periods": list(expected.values()),
             "filings": list(inventory.values()), "facts": observations,
         })
+    if by_url:
+        raise ValueError("Unexpected supplemental EDGAR captures in the manifest")
     return batch
 
 

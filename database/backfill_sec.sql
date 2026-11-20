@@ -13,7 +13,7 @@ SELECT document->>'cik' AS cik, filing.*
 FROM edgar_input
 CROSS JOIN LATERAL jsonb_to_recordset(document->'filings') AS filing(
     accession text, form_type text, filed_on date, accepted_at timestamptz, filing_url text,
-    fiscal_year smallint, fiscal_quarter smallint, starts_on date, ends_on date
+    fiscal_year smallint, fiscal_quarter smallint, starts_on date, ends_on date, metadata_source_url text
 );
 
 INSERT INTO raw.source_payloads (sha256, storage_key, byte_count)
@@ -36,7 +36,7 @@ SELECT source_kind, source_url, retrieved_at, sha256 FROM edgar_sources
 ON CONFLICT (source_kind, source_url, retrieved_at, payload_sha256) DO NOTHING;
 
 CREATE TEMP VIEW edgar_fetches AS
-SELECT source.cik, source.source_kind, saved.fetch_id
+SELECT source.cik, source.source_kind, source.source_url, saved.fetch_id
 FROM edgar_sources AS source
 JOIN raw.source_fetches AS saved
   ON (source.source_kind, source.source_url, source.retrieved_at, source.sha256)
@@ -68,10 +68,19 @@ FROM edgar_filings AS filing
 JOIN core.reporting_periods AS period
   ON period.cik = filing.cik AND period.fiscal_year = filing.fiscal_year
  AND period.fiscal_quarter IS NOT DISTINCT FROM filing.fiscal_quarter
-JOIN edgar_fetches AS source ON source.cik = filing.cik AND source.source_kind = 'sec_submissions';
+JOIN edgar_fetches AS source
+  ON source.cik = filing.cik AND source.source_url = filing.metadata_source_url
+ AND source.source_kind IN ('sec_submissions', 'sec_submissions_history');
 
 DO $validate$
 BEGIN
+    IF EXISTS (
+        SELECT FROM edgar_filings AS filing
+        LEFT JOIN edgar_matches AS matched USING (accession)
+        WHERE matched.accession IS NULL
+    ) THEN
+        RAISE EXCEPTION 'Missing archived Submissions evidence for a filing';
+    END IF;
     IF EXISTS (SELECT FROM edgar_matches WHERE (starts_on, ends_on) <> (stored_start, stored_end)) THEN
         RAISE EXCEPTION 'EDGAR reporting dates conflict with a stored period';
     END IF;

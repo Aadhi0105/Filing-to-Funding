@@ -29,6 +29,35 @@ For Rockwell, the consolidated net-income line is the appropriate denominator fo
 
 Dover's FY2021–FY2025 annual notes place finance leases in accrued expenses and other liabilities. The borrowing basis therefore uses the qualified debt lines directly. Rockwell's FY2023–FY2026 annual notes place finance leases in both current and noncurrent debt, so the disclosed total is deducted once. The older Rockwell presentation included current finance leases in other current liabilities. ITW's borrowing ratios and the remaining periods stay unavailable until the applicable lease treatment and amounts can be verified. [Dover FY2025 annual report](https://www.sec.gov/Archives/edgar/data/29905/000002990526000009/dov-20251231.htm) · [Rockwell FY2022 annual report](https://www.sec.gov/Archives/edgar/data/1024478/000102447822000093/rok-20220930.htm)
 
+## Annual results and year-over-year changes
+
+Migration 008 adds annual operating cash flow, cash capex, free cash flow, FCF margin, and cash conversion. Annual values use the exact full-year filing interval. The ratios use full-year revenue or net income from the same filing as the applicable cash flow. Cash conversion can still be available when capex is missing. Existing quarterly and trailing calculations use their own periods.
+
+The annual cash-flow query returns fiscal dates, day count, and calendar type. A full calendar year can include February 29. A reviewed week-based year retains its actual 364 or 371 days. A short fiscal year retains its dates and returns `unsupported_fiscal_period` for annual metrics. Trailing windows that include an unsupported quarter are withheld. The three-company backfill uses the cohort's reviewed month-end calendars. A new week-based issuer needs verified fiscal boundaries before ingestion.
+
+The change query compares the same fiscal period with the prior year for operating cash flow, cash capex, free cash flow, FCF margin, and cash conversion. It returns both sets of facts and filing accessions. A difference in reporting scope or an incompatible calendar withholds the comparison. Calendar-year comparisons allow a one-day leap-year difference. Week-based comparisons require equal durations, so a 53-week result remains visible on its own and is withheld from a change against a 52-week year.
+
+An available absolute change is the current amount minus the prior amount, expressed in the metric's own unit. For FCF margin, a difference of 0.01 is one percentage point. Percentage growth is `100 × (current − prior) ÷ prior` and requires a positive prior value. When the prior value is zero or negative, the absolute change remains available and growth returns `nonpositive_prior_value`.
+
+```sql
+SELECT period_start, period_end, calendar_type, operating_cash_flow, cash_capex, free_cash_flow
+FROM analytics.historical_annual_cash_flow(
+    '0001024478', 2026, 'consolidated', 'rok_sensia_transition_year', DATE '2026-11-12'
+);
+
+SELECT metric, value, numerator, denominator, status
+FROM analytics.historical_cash_flow_ratios(
+    '0001024478', 2026, NULL, 'consolidated', 'rok_sensia_transition_year', 'annual', DATE '2026-11-12'
+);
+
+SELECT metric, prior_value, current_value, absolute_change, percentage_growth, status, growth_status
+FROM analytics.historical_cash_flow_changes(
+    '0000049826', 2026, 2, 'consolidated', 'itw_from_fifo_change', 'quarter', DATE '2026-08-06'
+);
+```
+
+Rockwell's FY2026 annual filing supports $1.701B of free cash flow on $8.989B of revenue, giving an 18.92% FCF margin. ITW's comparable second-quarter FCF rose from $449M to $631M, an increase of $182M, or 40.53%. [Rockwell FY2026 annual filing](https://www.sec.gov/Archives/edgar/data/1024478/000102447826000048/rok-20260930.htm) · [ITW FY2026 Q2 filing](https://www.sec.gov/Archives/edgar/data/49826/000004982626000049/itw-20260630.htm)
+
 ## Reconciled results
 
 | Case | Verified result |

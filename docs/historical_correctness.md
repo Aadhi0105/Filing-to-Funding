@@ -27,6 +27,35 @@ Quarterly cash flow uses the exact fiscal start and subtraction of adjacent cumu
 
 The qualification applies to reported balance-sheet liquidity, reported debt where supported, and operating cash flow, cash capex, and free cash flow. The [financial ratio review](financial_ratios.md) extends this work with qualified revenue, net income, and borrowing-debt ratios. Peer rankings, the funding scenario, and dataset publication remain open parts of v1.2.
 
+## Filing revisions and amendments
+
+Migration 007 adds two queries. `analytics.filing_amendments` links an amendment to the unique earlier original for its issuer, report period, and SEC form. `analytics.filing_fact_revisions` compares consecutive compatible observations and returns both filing accessions, URLs, filing dates, reported values, reporting scopes, and fact IDs. Pass a date to apply the same New York end-of-day filing cutoff used by the historical calculations.
+
+| Relationship | Meaning and evidence |
+| --- | --- |
+| `unchanged_amendment` | The amended filing repeats the comparable amount for the same report. For ITW FY2021 Q2, the original and certification amendment both report $2.058B of cash. [ITW original](https://www.sec.gov/Archives/edgar/data/49826/000004982621000059/itw-20210630.htm) · [ITW amendment](https://www.sec.gov/Archives/edgar/data/49826/000004982621000064/itw-20210630.htm) |
+| `changed_value` | The reported amounts differ for the same concept, interval, unit, and scope. A difference can reflect reporting precision. Use the underlying fact IDs for the reported scale and source. |
+| `scope_change` | A reviewed filing explains a different reporting scope. Dover's original H1 2024 CFO was $370.255M on the scope including ESG. Its later comparative was $295.637M for continuing operations. Each observation stays on its own scope. [Dover original](https://www.sec.gov/Archives/edgar/data/29905/000002990524000035/dov-20240630.htm) · [Dover later comparative](https://www.sec.gov/Archives/edgar/data/29905/000002990525000024/dov-20250630.htm) |
+
+These queries link filing evidence. Use the filing's explicit disclosure to classify a formal restatement. An omitted fact produces no fact-level change. The query excludes conflicting observations and ambiguous filing chronology from inferred comparisons. The Dover scope link is explicitly reviewed, with automated comparisons confined to identical scopes.
+
+```sql
+SELECT original_accession, amendment_accession, relationship_reason
+FROM analytics.filing_amendments('0000049826', DATE '2021-08-06');
+
+SELECT concept, relationship, prior_value, later_value, prior_accession, later_accession
+FROM analytics.filing_fact_revisions('0000029905', DATE '2024-06-30', DATE '2025-07-24')
+WHERE relationship = 'scope_change';
+```
+
+## Filing conflict handling
+
+When a filing supplies different numeric values for the same qualified concept, period, unit, and reporting scope, the importer retains the competing values and their source locations. The historical selector withholds the affected value and its dependent metrics as `conflicting_observations` once that filing is eligible. Earlier cutoffs still use the prior eligible evidence. A filing that omits the line leaves the prior observation eligible. Duplicate evidence with equal amounts and differing reported precision retains the precision without creating a numeric conflict.
+
+When more than one table qualifies as the same primary statement, the importer reports the ambiguity and stops the import. The local publisher also rejects stored conflicts in qualified statement evidence before it can activate the candidate. The published version remains available, and the earlier cutoff continues to use its own filing evidence. [Local dataset publication](local_dataset_publication.md)
+
+The local validation used a synthetic variant of the ITW FY2021 Q2 amendment. An omitted cash line retained the original $2.058B observation. Two conflicting cash amounts withheld both cash and the cash ratio on the amendment's filing date, while the preceding cutoff still returned $2.058B. The conflicting candidate failed publication, and the clean test candidate passed all eight SQL checks.
+
 ## Reproduce locally
 
 The original packages and primary HTML are in the Git-ignored `.local/source-cache` directory. The local `.local/sec-statement-captures.jsonl` manifest records the fetch times and checksums. ITW FY2022 Q3 uses the archived primary HTML because the first ZIP request timed out. A resumed capture later retrieved the ZIP and produced the same normalized amounts, scopes, precision, and fact locators.
