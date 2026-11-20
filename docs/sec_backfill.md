@@ -48,8 +48,18 @@ python3 -m pipelines.backfill_sec --download \
 
 The downloader sends the contact only to the SEC in the request header. It records the retrieval timestamp after each successful response. A fresh download can include later source corrections, so keep the original manifest to reproduce this run. The fixed cutoff applies to the SEC filing date. Retrieval dates represent when the application obtained the snapshot. [SEC fair-access guidance](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data)
 
+## Historical submissions and request handling
+
+The recent Submissions response lists older files and their filing-date ranges. The capture follows the files that overlap the review window, including its opening inputs. It archives each response with its own URL, retrieval timestamp, and SHA-256 checksum. Replay checks that every required file is present and that overlapping rows agree before loading PostgreSQL. An exact duplicate keeps the recent source when both sources supply identical evidence. A history file can supply a missing acceptance timestamp, and each stored accession retains the source used for its metadata. [SEC EDGAR API documentation](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)
+
+The submissions and statement capture commands share a limit of two requests per second within this local checkout. Each request and retry uses the same budget. A transient server or network failure gets one retry, with a delay that honors `Retry-After`. A longer server-directed delay pauses both commands until the recorded time. An SEC access denial or rate limit stops the run and pauses both commands for at least ten minutes. The request header uses the declared project contact. [SEC fair-access guidance](https://www.sec.gov/about/developer-resources)
+
+A failed backfill preserves the prior manifest and published snapshot. Resume by running the capture after the SEC pause expires, or replay the existing archived manifest. The statement capture command also keeps completed filing captures so it can resume from the remaining accessions. The local request budget coordinates processes in this checkout. Deployments that run on several machines need a shared deployment-wide limit.
+
 ## Verification
 
 An independent download reproduced the 79-row inventory. Loading the frozen archive in a disposable PostgreSQL 17.12 database produced 79 filings and 2,273 candidate observations. A second import inserted zero rows and preserved the contents and IDs of the loaded tables. The reviewed pilot also replayed successfully after the backfill. An intentionally conflicting acceptance time caused the transaction to roll back. The original pilot checks and the historical import tests passed.
 
 The [historical accounting qualification](historical_correctness.md) verifies the selected tags against the original statements and records when standalone quarters and trailing results are available.
+
+Module 1.4 verified live responses from the recent and historical SEC endpoints. An isolated rebuild with a filing moved to an older file reproduced all 79 accessions and preserved the source of each. An identical replay kept the same rows and IDs. Conflicting metadata rejected the candidate and preserved the last good version. Offline tests covered transient failures, shared cooldowns, missing files, and duplicate accessions.

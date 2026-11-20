@@ -14,7 +14,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from uuid import uuid4
 
-from pipelines.backfill_sec import CUTOFF, MANIFEST as SEC_MANIFEST
+from pipelines.backfill_sec import CUTOFF, HISTORY_KIND, MANIFEST as SEC_MANIFEST
 from pipelines.load_pilot import ROOT, compose_psql
 from pipelines.qualify_sec import MANIFEST as STATEMENT_MANIFEST
 from pipelines.treasury_history import MANIFEST as TREASURY_MANIFEST, WINDOW_END, WINDOW_START
@@ -22,8 +22,10 @@ from pipelines.treasury_history import MANIFEST as TREASURY_MANIFEST, WINDOW_END
 DATASETS = ROOT / ".local/datasets"
 FORMAT_VERSION = 1
 CHECKS = (
+    "sec_statement_conflicts",
     "pilot_storage", "pilot_ingestion", "pilot_analytics", "sec_backfill",
     "historical_cash_flow", "financial_ratios", "treasury_history",
+    "filing_revisions", "fiscal_period_metrics",
 )
 IMPORTS = {
     "sec": ("pipelines.backfill_sec", "sec.json"),
@@ -74,7 +76,7 @@ def methodology():
         *(ROOT / "testdata/reconciled").glob("*.json"),
         *(ROOT / name for name in (
             "docs/sec_filing_inventory.csv", "pipelines/load_pilot.py", "pipelines/backfill_sec.py",
-            "pipelines/qualify_sec.py", "pipelines/treasury_history.py",
+            "pipelines/qualify_sec.py", "pipelines/sec_http.py", "pipelines/treasury_history.py",
         )),
     ]
     return {path.relative_to(ROOT).as_posix(): file_digest(path) for path in sorted(paths)}
@@ -91,6 +93,8 @@ def capture_identity(captures):
         for record in records:
             if kind == "sec":
                 key = f"sec:{record['cik']}:{record['source_kind']}"
+                if record["source_kind"] == HISTORY_KIND:
+                    key += f":{record['source_url']}"
             elif kind == "statements":
                 key = f"filing:{record['accession']}"
             else:
@@ -109,6 +113,14 @@ def capture_identity(captures):
 def require_current_sources(previous, candidate):
     for key, old in previous.items():
         new = candidate.get(key)
+        if new is None and key.startswith("sec:") and f":{HISTORY_KIND}:" in key:
+            root_key = f"sec:{key.split(':', 2)[1]}:sec_submissions"
+            old_root, new_root = previous.get(root_key), candidate.get(root_key)
+            # EDGAR can move reports between files. The new index must change and the
+            # normal backfill checks must validate all of its required files and accessions.
+            if (old_root and new_root and new_root["retrieved_at"] > old_root["retrieved_at"]
+                    and new_root["sha256"] != old_root["sha256"]):
+                continue
         if new is None or new["retrieved_at"] < old["retrieved_at"]:
             raise ValueError(f"Candidate source capture is missing or older for {key}")
         if new["retrieved_at"] == old["retrieved_at"] and new["sha256"] != old["sha256"]:

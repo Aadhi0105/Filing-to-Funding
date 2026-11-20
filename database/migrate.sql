@@ -63,4 +63,31 @@ SELECT NOT EXISTS (
     INSERT INTO raw.schema_migrations (version) VALUES ('006_treasury_history');
 \endif
 
+SELECT NOT EXISTS (
+    SELECT 1 FROM raw.schema_migrations WHERE version = '007_filing_revisions'
+) AS apply_filing_revisions \gset
+
+\if :apply_filing_revisions
+    \ir migrations/007_filing_revisions.sql
+    INSERT INTO raw.schema_migrations (version) VALUES ('007_filing_revisions');
+\endif
+
+SELECT NOT EXISTS (
+    SELECT 1 FROM raw.schema_migrations WHERE version = '008_fiscal_period_metrics'
+) AS apply_fiscal_period_metrics \gset
+
+\if :apply_fiscal_period_metrics
+    \ir migrations/008_fiscal_period_metrics.sql
+    INSERT INTO raw.schema_migrations (version) VALUES ('008_fiscal_period_metrics');
+\endif
+
+SELECT NOT EXISTS (
+    SELECT 1 FROM raw.schema_migrations WHERE version = '009_sec_submission_history'
+) AS apply_sec_submission_history \gset
+
+\if :apply_sec_submission_history
+    \ir migrations/009_sec_submission_history.sql
+    INSERT INTO raw.schema_migrations (version) VALUES ('009_sec_submission_history');
+\endif
+
 COMMIT;

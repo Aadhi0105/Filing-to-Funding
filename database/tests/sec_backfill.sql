@@ -8,7 +8,7 @@ BEGIN
     SELECT count(*) INTO filing_count
     FROM core.filings AS filing
     JOIN raw.source_fetches AS source ON source.fetch_id = filing.metadata_fetch_id
-    WHERE source.source_kind = 'sec_submissions';
+    WHERE source.source_kind IN ('sec_submissions', 'sec_submissions_history');
 
     SELECT count(*) INTO fact_count
     FROM core.reported_facts AS fact

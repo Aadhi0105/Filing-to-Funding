@@ -9,7 +9,6 @@ import json
 import re
 import subprocess
 import sys
-import time
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -17,7 +16,8 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 from zipfile import BadZipFile, ZipFile, is_zipfile
 
-from pipelines.backfill_sec import EdgarDownloadError, download_edgar, sec_contact, utc_timestamp
+from pipelines.backfill_sec import utc_timestamp
+from pipelines.sec_http import EdgarDownloadError, download_edgar, sec_contact
 from pipelines.load_pilot import ROOT, archive_payload, compose_psql
 
 INVENTORY = ROOT / "docs/sec_filing_inventory.csv"
@@ -171,12 +171,16 @@ def amount(node):
     return Decimal(("-" if sign else "") + displayed.replace(",", "")).scaleb(scale)
 
 
-def consistent_value(rows):
+def fact_evidence(rows, *, nonnegative=False):
     values = {}
     for row in rows:
         node = row[3]
         values.setdefault((amount(node), node.attrib["decimals"]), node)
-    return next(iter(values.items())) if len(values) == 1 else None
+    # Keep both sides of a conflict even if one amount would not qualify on its own.
+    amounts = {value for value, _ in values}
+    if nonnegative and len(amounts) == 1 and next(iter(amounts)) < 0:
+        return ()
+    return values.items()
 
 
 def make_fact(filing, source, concept, period, basis, scope, evidence, sign=1):
@@ -209,9 +213,8 @@ def balance_facts(filing, source, entries, period, document, contexts):
         specs["current_portion_long_term_debt"] = ({"LongTermDebtCurrent"}, r"current portion of long.term debt")
     for concept, (tags, label) in specs.items():
         key = [entry for entry in selected if entry[1] in tags and re.fullmatch(label, entry[0])]
-        value = consistent_value(key)
-        if value:
-            yield make_fact(filing, source, concept, period, "consolidated", "historical_balance_sheet", value)
+        for evidence in fact_evidence(key):
+            yield make_fact(filing, source, concept, period, "consolidated", "historical_balance_sheet", evidence)
 
     if filing["fiscal_period"] != "FY" or filing["ticker"] not in {"ROK", "DOV"}:
         return
@@ -231,10 +234,8 @@ def balance_facts(filing, source, entries, period, document, contexts):
         if local_name(node) == lease_tag and contexts.get(node.get("contextRef")) == period
         and node.get("unitRef") in usd
     ]
-    leases = consistent_value(disclosures)
-    if leases and leases[0][0] >= 0:
-        yield make_fact(filing, source, concept, period, "consolidated",
-                        "historical_balance_sheet", leases)
+    for evidence in fact_evidence(disclosures, nonnegative=True):
+        yield make_fact(filing, source, concept, period, "consolidated", "historical_balance_sheet", evidence)
 
 
 def cash_flow_scope(filing, period, tag):
@@ -278,21 +279,21 @@ def flow_facts(filing, source, entries, current, supported_ends):
         if len(cfo_tags) != 1:
             continue
         scope = cash_flow_scope(filing, period, next(iter(cfo_tags)))
-        cfo = consistent_value(cfo_rows)
-        capex = consistent_value(cash_capex)
-        if cfo and scope:
-            yield make_fact(filing, source, "operating_cash_flow", period, *scope, cfo)
-            if capex and capex[0][0] >= 0:
-                yield make_fact(filing, source, "cash_capex_outflow", period, *scope, capex, sign=-1)
+        if scope:
+            for evidence in fact_evidence(cfo_rows):
+                yield make_fact(filing, source, "operating_cash_flow", period, *scope, evidence)
+            for evidence in fact_evidence(cash_capex, nonnegative=True):
+                yield make_fact(filing, source, "cash_capex_outflow", period, *scope, evidence, sign=-1)
 
 
 def income_facts(filing, source, entries, cash_flows):
     revenue_label = {"DOV": "revenue", "ITW": "operating revenue", "ROK": ""}[filing["ticker"]]
-    for flow in cash_flows:
-        if flow["concept"] != "operating_cash_flow":
-            continue
-        period = (date.fromisoformat(flow["period_start"]), date.fromisoformat(flow["period_end"]))
-        basis, scope = flow["reporting_basis"], flow["scope_key"]
+    flow_contexts = dict.fromkeys(
+        (flow["period_start"], flow["period_end"], flow["reporting_basis"], flow["scope_key"])
+        for flow in cash_flows if flow["concept"] == "operating_cash_flow"
+    )
+    for start, end, basis, scope in flow_contexts:
+        period = (date.fromisoformat(start), date.fromisoformat(end))
         rows = [row for row in entries if row[2] == period]
         if basis == "continuing_operations":
             income_tag, income_label = "IncomeLossFromContinuingOperations", "earnings from continuing operations"
@@ -302,15 +303,15 @@ def income_facts(filing, source, entries, cash_flows):
             income_tag, income_label = "NetIncomeLoss", "net earnings"
         else:
             income_tag, income_label = "ProfitLoss", "net income"
-        net_income = consistent_value([row for row in rows if row[:2] == (income_label, income_tag)])
-        if net_income is None and basis == "continuing_operations":
+        income_rows = [row for row in rows if row[:2] == (income_label, income_tag)]
+        if not income_rows and basis == "continuing_operations":
             # The explicit continuing-operations earnings line also confirms revenue's presentation basis.
             continue
-        revenue = consistent_value([row for row in rows if row[0] == revenue_label and row[1] in REVENUE_TAGS])
-        if revenue is not None:
-            yield make_fact(filing, source, "revenue", period, basis, scope, revenue)
-        if net_income is not None:
-            yield make_fact(filing, source, "net_income", period, basis, scope, net_income)
+        revenue_rows = [row for row in rows if row[0] == revenue_label and row[1] in REVENUE_TAGS]
+        for evidence in fact_evidence(revenue_rows):
+            yield make_fact(filing, source, "revenue", period, basis, scope, evidence)
+        for evidence in fact_evidence(income_rows):
+            yield make_fact(filing, source, "net_income", period, basis, scope, evidence)
 
 
 def qualify(filing, source, supported_ends):
@@ -333,13 +334,17 @@ def qualify(filing, source, supported_ends):
             flows.append(table)
         if cumulative_tags & REVENUE_TAGS and cumulative_tags & INCOME_TAGS and cumulative_tags & INCOME_ANCHORS:
             earnings.append(table)
+    for statement, tables in (("balance sheets", balances), ("cash-flow statements", flows),
+                              ("income statements", earnings)):
+        if len(tables) > 1:
+            raise ValueError(f"Ambiguous primary {statement} in {filing['accession']}")
     facts = []
-    if len(balances) == 1:
+    if balances:
         facts.extend(balance_facts(filing, source, balances[0], as_of, document, contexts))
-    if len(flows) == 1:
+    if flows:
         cash_flows = list(flow_facts(filing, source, flows[0], cumulative, supported_ends))
         facts.extend(cash_flows)
-        if len(earnings) == 1:
+        if earnings:
             facts.extend(income_facts(filing, source, earnings[0], cash_flows))
     return facts
 
@@ -380,7 +385,6 @@ def download_statements(manifest):
             except EdgarDownloadError as error:
                 if error.status not in {"404", "500", "502", "503", "504"}:
                     raise
-                time.sleep(0.85)
                 url, suffix = primary, "html"
                 data, retrieved_at = download_edgar(url, contact, MAX_BYTES)
                 if ET.fromstring(data).tag != XHTML + "html":
@@ -391,7 +395,6 @@ def download_statements(manifest):
             }
             records.write(json.dumps(source) + "\n")
             records.flush()
-            time.sleep(0.85)
 
 
 def input_batch(manifest):
@@ -409,6 +412,20 @@ def input_batch(manifest):
         yield row, source, qualify(row, source, supported_ends[row["cik"]]) if source else []
 
 
+def conflicting_concepts(facts):
+    amounts = defaultdict(set)
+    for fact in facts:
+        context = (fact["concept"], fact["period_start"], fact["period_end"], fact["reporting_basis"], fact["scope_key"])
+        amounts[context].add(Decimal(fact["value"]))
+    return {context[0] for context, values in amounts.items() if len(values) > 1}
+
+
+def coverage_status(required, concepts, conflicts, available, missing):
+    if required & conflicts:
+        return "conflicting_observations"
+    return available if required <= concepts else missing
+
+
 def report(records):
     output = csv.writer(sys.stdout, lineterminator="\n")
     output.writerow([
@@ -419,15 +436,21 @@ def report(records):
     ])
     for filing, source, facts in records:
         current = [fact for fact in facts if fact["period_end"] == filing["report_end"]]
-        concepts = {fact["concept"] for fact in current}
+        conflicts = conflicting_concepts(current)
+        by_concept = {fact["concept"]: fact for fact in current if fact["concept"] not in conflicts}
+        concepts = by_concept.keys()
         liquidity = {"current_assets", "current_liabilities", "cash_and_equivalents"}
         debt = {"short_term_debt", "noncurrent_debt"}
         if filing["ticker"] == "ROK":
             debt.add("current_portion_long_term_debt")
-        by_concept = {fact["concept"]: fact for fact in current}
         flow = by_concept.get("operating_cash_flow", {})
+        lease = {"finance_lease_liabilities"}
+        lease_basis = lease | {"finance_lease_liabilities_outside_debt"}
+        cash_flow = {"operating_cash_flow", "cash_capex_outflow"}
         debt_basis = "unverified"
-        if debt <= concepts:
+        if conflicts & (debt | lease_basis):
+            debt_basis = "conflicting_observations"
+        elif debt <= concepts:
             if "finance_lease_liabilities" in concepts:
                 debt_basis = "finance_leases_deducted"
             elif "finance_lease_liabilities_outside_debt" in concepts:
@@ -435,17 +458,17 @@ def report(records):
         output.writerow([
             *(filing[key] for key in ("ticker", "window", "fiscal_year", "fiscal_period", "report_end", "accession")),
             filing["filing_url"], source["sha256"] if source else "",
-            "qualified" if liquidity <= concepts else "missing_statement_inputs",
-            "qualified_reported_basis" if debt <= concepts else "missing_statement_inputs",
-            "qualified" if debt <= concepts and "finance_lease_liabilities" in concepts else "unverified",
+            coverage_status(liquidity, concepts, conflicts, "qualified", "missing_statement_inputs"),
+            coverage_status(debt, concepts, conflicts, "qualified_reported_basis", "missing_statement_inputs"),
+            coverage_status(debt | lease, concepts, conflicts, "qualified", "unverified"),
             by_concept.get("cash_and_equivalents", {}).get("source_tag", ""),
-            "qualified" if flow and "cash_capex_outflow" in concepts else "missing_compatible_inputs",
+            coverage_status(cash_flow, concepts, conflicts, "qualified", "missing_compatible_inputs"),
             flow.get("reporting_basis", ""),
             flow.get("scope_key", ""), by_concept.get("cash_capex_outflow", {}).get("source_tag", ""),
             sum(fact["period_end"] != filing["report_end"]
                 and fact["concept"] in {"operating_cash_flow", "cash_capex_outflow"} for fact in facts),
-            "qualified" if "revenue" in concepts else "missing_compatible_inputs",
-            "qualified" if "net_income" in concepts else "missing_compatible_inputs",
+            coverage_status({"revenue"}, concepts, conflicts, "qualified", "missing_compatible_inputs"),
+            coverage_status({"net_income"}, concepts, conflicts, "qualified", "missing_compatible_inputs"),
             debt_basis,
         ])
 
