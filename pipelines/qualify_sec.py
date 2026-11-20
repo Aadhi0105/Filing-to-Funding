@@ -1,4 +1,4 @@
-"""Qualify historical liquidity and cash flows from EDGAR's primary statements."""
+"""Qualify historical financial inputs from EDGAR primary statements."""
 
 import argparse
 import csv
@@ -35,10 +35,25 @@ TOTAL_CFO = "NetCashProvidedByUsedInOperatingActivities"
 CONTINUING_CFO = "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"
 CAPEX = {"PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"}
 BALANCE_TAGS = CASH | CURRENT_DEBT | NONCURRENT_DEBT | {"Assets", "AssetsCurrent", "LiabilitiesCurrent"}
-FLOW_TAGS = CAPEX | {TOTAL_CFO, CONTINUING_CFO}
+INVESTING_TOTALS = {"NetCashProvidedByUsedInInvestingActivities",
+                    "NetCashProvidedByUsedInInvestingActivitiesContinuingOperations"}
+FINANCING_TOTALS = {"NetCashProvidedByUsedInFinancingActivities",
+                    "NetCashProvidedByUsedInFinancingActivitiesContinuingOperations"}
+FLOW_TAGS = CAPEX | {TOTAL_CFO, CONTINUING_CFO} | INVESTING_TOTALS | FINANCING_TOTALS
+REVENUE_TAGS = {
+    "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "RevenueFromContractWithCustomerIncludingAssessedTax",
+}
+INCOME_TAGS = {"ProfitLoss", "NetIncomeLoss", "IncomeLossFromContinuingOperations"}
+INCOME_ANCHORS = {"CostOfGoodsAndServicesSold", "OperatingIncomeLoss"}
+NONCONTROLLING_INCOME = "NetIncomeLossAttributableToNoncontrollingInterest"
+STATEMENT_TAGS = BALANCE_TAGS | FLOW_TAGS | REVENUE_TAGS | INCOME_TAGS | INCOME_ANCHORS | {NONCONTROLLING_INCOME}
 ROK_LEASE_POLICY = (
     "long-term finance lease liabilities are presented as long-term debt and current finance lease liabilities "
     "are included in current portion of long-term debt"
+)
+DOV_LEASE_POLICY = (
+    "the related lease liabilities are included in other accrued expenses and other liabilities"
 )
 MAX_BYTES = 12 * 1024 * 1024
 
@@ -134,7 +149,7 @@ def statement_rows(document, contexts):
                     nodes.append(hidden[reference[1]])
             for node in nodes:
                 context = contexts.get(node.get("contextRef"))
-                if context and node.get("unitRef") in usd and local_name(node) in BALANCE_TAGS | FLOW_TAGS:
+                if context and node.get("unitRef") in usd and local_name(node) in STATEMENT_TAGS:
                     entries.append((label, local_name(node), context, node))
         if entries:
             yield entries
@@ -177,7 +192,9 @@ def make_fact(filing, source, concept, period, basis, scope, evidence, sign=1):
 
 def balance_facts(filing, source, entries, period, document, contexts):
     selected = [entry for entry in entries if entry[2] == period]
+    total_assets_label = {"DOV": "total assets", "ITW": "", "ROK": "total"}[filing["ticker"]]
     specs = {
+        "total_assets": ({"Assets"}, total_assets_label),
         "current_assets": ({"AssetsCurrent"}, r"total current assets"),
         "current_liabilities": ({"LiabilitiesCurrent"}, r"total current liabilities"),
         "cash_and_equivalents": (CASH, r"cash and (?:cash )?equivalents"),
@@ -196,20 +213,28 @@ def balance_facts(filing, source, entries, period, document, contexts):
         if value:
             yield make_fact(filing, source, concept, period, "consolidated", "historical_balance_sheet", value)
 
-    # The total lease liability can be deducted only when the note includes both portions in debt.
-    if filing["ticker"] == "ROK" and filing["fiscal_period"] == "FY" and ROK_LEASE_POLICY in text(document).lower():
-        lease_tag = "FinanceLeaseLiability"
-        usd = {unit.attrib["id"] for unit in document.iter(INSTANCE + "unit")
-               if [child.text for child in unit] == ["iso4217:USD"]}
-        disclosures = [
-            ("", lease_tag, period, node) for node in document.iter(IX + "nonFraction")
-            if local_name(node) == lease_tag and contexts.get(node.get("contextRef")) == period
-            and node.get("unitRef") in usd
-        ]
-        leases = consistent_value(disclosures)
-        if leases and leases[0][0] >= 0:
-            yield make_fact(filing, source, "finance_lease_liabilities", period, "consolidated",
-                            "historical_balance_sheet", leases)
+    if filing["fiscal_period"] != "FY" or filing["ticker"] not in {"ROK", "DOV"}:
+        return
+    notes = text(document).lower()
+    if filing["ticker"] == "ROK" and ROK_LEASE_POLICY in notes:
+        concept = "finance_lease_liabilities"
+    elif filing["ticker"] == "DOV" and DOV_LEASE_POLICY in notes:
+        concept = "finance_lease_liabilities_outside_debt"
+    else:
+        return
+
+    lease_tag = "FinanceLeaseLiability"
+    usd = {unit.attrib["id"] for unit in document.iter(INSTANCE + "unit")
+           if [child.text for child in unit] == ["iso4217:USD"]}
+    disclosures = [
+        ("", lease_tag, period, node) for node in document.iter(IX + "nonFraction")
+        if local_name(node) == lease_tag and contexts.get(node.get("contextRef")) == period
+        and node.get("unitRef") in usd
+    ]
+    leases = consistent_value(disclosures)
+    if leases and leases[0][0] >= 0:
+        yield make_fact(filing, source, concept, period, "consolidated",
+                        "historical_balance_sheet", leases)
 
 
 def cash_flow_scope(filing, period, tag):
@@ -255,9 +280,37 @@ def flow_facts(filing, source, entries, current, supported_ends):
         scope = cash_flow_scope(filing, period, next(iter(cfo_tags)))
         cfo = consistent_value(cfo_rows)
         capex = consistent_value(cash_capex)
-        if cfo and capex and capex[0][0] >= 0 and scope:
+        if cfo and scope:
             yield make_fact(filing, source, "operating_cash_flow", period, *scope, cfo)
-            yield make_fact(filing, source, "cash_capex_outflow", period, *scope, capex, sign=-1)
+            if capex and capex[0][0] >= 0:
+                yield make_fact(filing, source, "cash_capex_outflow", period, *scope, capex, sign=-1)
+
+
+def income_facts(filing, source, entries, cash_flows):
+    revenue_label = {"DOV": "revenue", "ITW": "operating revenue", "ROK": ""}[filing["ticker"]]
+    for flow in cash_flows:
+        if flow["concept"] != "operating_cash_flow":
+            continue
+        period = (date.fromisoformat(flow["period_start"]), date.fromisoformat(flow["period_end"]))
+        basis, scope = flow["reporting_basis"], flow["scope_key"]
+        rows = [row for row in entries if row[2] == period]
+        if basis == "continuing_operations":
+            income_tag, income_label = "IncomeLossFromContinuingOperations", "earnings from continuing operations"
+        elif filing["ticker"] == "DOV":
+            if any(row[1] == NONCONTROLLING_INCOME for row in rows):
+                continue
+            income_tag, income_label = "NetIncomeLoss", "net earnings"
+        else:
+            income_tag, income_label = "ProfitLoss", "net income"
+        net_income = consistent_value([row for row in rows if row[:2] == (income_label, income_tag)])
+        if net_income is None and basis == "continuing_operations":
+            # The explicit continuing-operations earnings line also confirms revenue's presentation basis.
+            continue
+        revenue = consistent_value([row for row in rows if row[0] == revenue_label and row[1] in REVENUE_TAGS])
+        if revenue is not None:
+            yield make_fact(filing, source, "revenue", period, basis, scope, revenue)
+        if net_income is not None:
+            yield make_fact(filing, source, "net_income", period, basis, scope, net_income)
 
 
 def qualify(filing, source, supported_ends):
@@ -268,19 +321,26 @@ def qualify(filing, source, supported_ends):
     start = date(fiscal_year - 1, 10, 1) if filing["ticker"] == "ROK" else date(fiscal_year, 1, 1)
     as_of = (None, end)
     cumulative = (start, end)
-    balances, flows = [], []
+    balances, flows, earnings = [], [], []
     for table in statement_rows(document, contexts):
         tags = {(entry[1], entry[2]) for entry in table}
         if all((tag, as_of) in tags for tag in ("Assets", "AssetsCurrent", "LiabilitiesCurrent")):
             balances.append(table)
-        if (any((tag, cumulative) in tags for tag in {TOTAL_CFO, CONTINUING_CFO})
-                and any((tag, cumulative) in tags for tag in CAPEX)):
+        cumulative_tags = {tag for tag, period in tags if period == cumulative}
+        if cumulative_tags & {TOTAL_CFO, CONTINUING_CFO} and (
+            cumulative_tags & CAPEX or (cumulative_tags & INVESTING_TOTALS and cumulative_tags & FINANCING_TOTALS)
+        ):
             flows.append(table)
+        if cumulative_tags & REVENUE_TAGS and cumulative_tags & INCOME_TAGS and cumulative_tags & INCOME_ANCHORS:
+            earnings.append(table)
     facts = []
     if len(balances) == 1:
         facts.extend(balance_facts(filing, source, balances[0], as_of, document, contexts))
     if len(flows) == 1:
-        facts.extend(flow_facts(filing, source, flows[0], cumulative, supported_ends))
+        cash_flows = list(flow_facts(filing, source, flows[0], cumulative, supported_ends))
+        facts.extend(cash_flows)
+        if len(earnings) == 1:
+            facts.extend(income_facts(filing, source, earnings[0], cash_flows))
     return facts
 
 
@@ -355,7 +415,7 @@ def report(records):
         "ticker", "window", "fiscal_year", "fiscal_period", "report_end", "accession", "statement_url",
         "statement_sha256", "liquidity_inputs", "reported_debt_inputs", "lease_adjustment",
         "cash_source_tag", "cash_flow_inputs", "cash_flow_basis", "cash_flow_scope", "capex_source_tag",
-        "comparative_cash_flow_observations",
+        "comparative_cash_flow_observations", "revenue_inputs", "net_income_inputs", "borrowing_debt_basis",
     ])
     for filing, source, facts in records:
         current = [fact for fact in facts if fact["period_end"] == filing["report_end"]]
@@ -366,6 +426,12 @@ def report(records):
             debt.add("current_portion_long_term_debt")
         by_concept = {fact["concept"]: fact for fact in current}
         flow = by_concept.get("operating_cash_flow", {})
+        debt_basis = "unverified"
+        if debt <= concepts:
+            if "finance_lease_liabilities" in concepts:
+                debt_basis = "finance_leases_deducted"
+            elif "finance_lease_liabilities_outside_debt" in concepts:
+                debt_basis = "finance_leases_outside_debt"
         output.writerow([
             *(filing[key] for key in ("ticker", "window", "fiscal_year", "fiscal_period", "report_end", "accession")),
             filing["filing_url"], source["sha256"] if source else "",
@@ -373,9 +439,14 @@ def report(records):
             "qualified_reported_basis" if debt <= concepts else "missing_statement_inputs",
             "qualified" if debt <= concepts and "finance_lease_liabilities" in concepts else "unverified",
             by_concept.get("cash_and_equivalents", {}).get("source_tag", ""),
-            "qualified" if flow else "missing_compatible_inputs", flow.get("reporting_basis", ""),
+            "qualified" if flow and "cash_capex_outflow" in concepts else "missing_compatible_inputs",
+            flow.get("reporting_basis", ""),
             flow.get("scope_key", ""), by_concept.get("cash_capex_outflow", {}).get("source_tag", ""),
-            len(facts) - len(current),
+            sum(fact["period_end"] != filing["report_end"]
+                and fact["concept"] in {"operating_cash_flow", "cash_capex_outflow"} for fact in facts),
+            "qualified" if "revenue" in concepts else "missing_compatible_inputs",
+            "qualified" if "net_income" in concepts else "missing_compatible_inputs",
+            debt_basis,
         ])
 
 

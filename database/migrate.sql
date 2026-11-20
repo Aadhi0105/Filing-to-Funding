@@ -45,4 +45,13 @@ SELECT NOT EXISTS (
     INSERT INTO raw.schema_migrations (version) VALUES ('004_historical_cash_flow');
 \endif
 
+SELECT NOT EXISTS (
+    SELECT 1 FROM raw.schema_migrations WHERE version = '005_financial_ratios'
+) AS apply_financial_ratios \gset
+
+\if :apply_financial_ratios
+    \ir migrations/005_financial_ratios.sql
+    INSERT INTO raw.schema_migrations (version) VALUES ('005_financial_ratios');
+\endif
+
 COMMIT;
