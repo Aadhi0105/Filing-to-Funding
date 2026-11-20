@@ -56,4 +56,4 @@ For a new download, use the official URLs above and record the actual completion
 
 ### Remaining source gate
 
-Command-line SEC requests returned HTTP 403 for the ZIP, extracted instance, index, and company concept endpoint during this check. An automated path that follows the [SEC's fair-access guidance](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data) is still needed for the three-company backfill. The single Treasury retrieval proves the sampled values and provenance. Historical Treasury vintages and recurring source availability still require verification.
+Command-line SEC requests returned HTTP 403 during the original-source sample check. The subsequent historical backfill used a declared project contact in line with the [SEC's fair-access guidance](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data) and successfully downloaded Submissions and Company Facts for all three issuers. The Treasury retrieval proves the sampled values and provenance. Historical Treasury vintages and recurring source availability still require verification. [Historical backfill and replay instructions](sec_backfill.md)

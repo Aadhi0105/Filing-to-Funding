@@ -4,11 +4,12 @@ DO $test$
 DECLARE
     observed numeric;
     accepted_time timestamptz;
+    metadata_kind text;
 BEGIN
     IF (SELECT count(*) FROM raw.source_fetches
         WHERE source_kind IN ('sec_filing_review', 'treasury_yield_review')) <> 8
-       OR (SELECT count(*) FROM core.filings
-           JOIN raw.source_fetches ON fetch_id = metadata_fetch_id
+       OR (SELECT count(DISTINCT accession) FROM core.reported_facts
+           JOIN raw.source_fetches ON fetch_id = source_fetch_id
            WHERE source_kind = 'sec_filing_review') <> 7
        OR (SELECT count(*) FROM core.reported_facts WHERE taxonomy = 'filing-line') <> 51
        OR (SELECT count(*) FROM core.treasury_yield_observations
@@ -53,10 +54,16 @@ BEGIN
         RAISE EXCEPTION 'Eastern acceptance was not converted to the correct UTC instant';
     END IF;
 
-    SELECT accepted_at INTO STRICT accepted_time
-    FROM core.filings WHERE accession = '0001024478-26-000048';
-    IF accepted_time IS NOT NULL THEN
-        RAISE EXCEPTION 'Rockwell acceptance was inferred from a filing date or retrieval time';
+    SELECT filing.accepted_at, source.source_kind INTO STRICT accepted_time, metadata_kind
+    FROM core.filings AS filing
+    JOIN raw.source_fetches AS source ON source.fetch_id = filing.metadata_fetch_id
+    WHERE filing.accession = '0001024478-26-000048';
+    IF metadata_kind = 'sec_submissions' THEN
+        IF accepted_time IS DISTINCT FROM TIMESTAMPTZ '2026-11-12 16:35:11+00' THEN
+            RAISE EXCEPTION 'Rockwell acceptance differs from the verified EDGAR timestamp';
+        END IF;
+    ELSIF accepted_time IS NOT NULL THEN
+        RAISE EXCEPTION 'Rockwell acceptance was inferred without the verified EDGAR metadata';
     END IF;
 
     SELECT yield_percent INTO STRICT observed

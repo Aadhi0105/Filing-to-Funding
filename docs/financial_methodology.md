@@ -28,7 +28,7 @@ Both calculation functions return a status, fact IDs, and filing accessions. Bal
 |---|---|
 | ITW FY2026 Q2 | As of 6 August 2026, operating cash flow is **$723 million**, capex is **$92 million**, and free cash flow is **$631 million**. As of 5 August the quarter's flows are unavailable. Working capital is **$647 million** and reported net debt is **$8.855 billion**. |
 | Dover FY2024 Q3 | Continuing-operations Q3 is unavailable at the 24 October 2024 cutoff in the reviewed filing set. The eligible comparative at the 24 July 2025 cutoff supports **$353.244 million** of Q3 operating cash flow and **$315.490 million** of free cash flow. Both source accessions are returned. |
-| Rockwell FY2026 Q4 | Latest reported free cash flow is **$602 million**, and year-end borrowing debt excluding disclosed finance leases is **$3.276 billion**. The annual filing's acceptance time remains unverified, so strict historical queries exclude it. The June balance has no verified finance lease adjustment in the sample. |
+| Rockwell FY2026 Q4 | Latest reported free cash flow is **$602 million**, and year-end borrowing debt excluding disclosed finance leases is **$3.276 billion**. The historical backfill verified annual acceptance at 11:35:11 Eastern on 12 November 2026. The reviewed value is eligible from that New York date in databases loaded with the backfill. The June balance has no verified finance lease adjustment in the sample. |
 
 After [loading the pilot data](source_register.md#run-and-verify-the-import), apply the migrations and run the analytics checks:
 

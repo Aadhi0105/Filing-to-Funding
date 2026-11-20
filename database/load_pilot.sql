@@ -44,9 +44,13 @@ ON CONFLICT (cik) DO NOTHING;
 
 -- Alias coverage begins at the first filing in this pilot, not the actual listing date.
 INSERT INTO core.issuer_aliases (cik, alias_kind, alias, valid_from)
-SELECT cik, 'ticker', ticker, min(filed_on)
-FROM pilot_filings
-GROUP BY cik, ticker
+SELECT filing.cik, 'ticker', filing.ticker, min(filing.filed_on)
+FROM pilot_filings AS filing
+WHERE NOT EXISTS (
+    SELECT FROM core.issuer_aliases AS alias
+    WHERE alias.cik = filing.cik AND alias.alias_kind = 'ticker' AND alias.alias = filing.ticker
+)
+GROUP BY filing.cik, filing.ticker
 ON CONFLICT (cik, alias_kind, alias, valid_from) DO NOTHING;
 
 INSERT INTO core.reporting_periods (cik, fiscal_year, fiscal_quarter, starts_on, ends_on)
@@ -74,11 +78,14 @@ BEGIN
         SELECT 1
         FROM pilot_period_matches AS expected
         JOIN core.filings AS actual USING (accession)
-        WHERE (actual.cik, actual.report_period_id, actual.form_type, actual.filed_on,
-               actual.accepted_at, actual.acceptance_timezone, actual.filing_url)
+        JOIN raw.source_fetches AS metadata ON metadata.fetch_id = actual.metadata_fetch_id
+        WHERE (actual.cik, actual.report_period_id, actual.form_type, actual.filed_on, actual.filing_url)
            IS DISTINCT FROM
-              (expected.cik, expected.period_id, expected.form_type, expected.filed_on,
-               expected.accepted_at, expected.acceptance_timezone, expected.source_url)
+              (expected.cik, expected.period_id, expected.form_type, expected.filed_on, expected.source_url)
+           OR (expected.accepted_at IS NOT NULL AND actual.accepted_at IS DISTINCT FROM expected.accepted_at)
+           OR (metadata.source_kind NOT IN ('sec_submissions', 'sec_filing_index')
+               AND (actual.accepted_at, actual.acceptance_timezone)
+                   IS DISTINCT FROM (expected.accepted_at, expected.acceptance_timezone))
     ) THEN
         RAISE EXCEPTION 'Pilot filing metadata conflicts with an existing accession';
     END IF;
