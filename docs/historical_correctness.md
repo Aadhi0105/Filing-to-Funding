@@ -25,7 +25,7 @@ Run `analytics.historical_quarter_cash_flow` and `analytics.historical_ttm_cash_
 
 Quarterly cash flow uses the exact fiscal start and subtraction of adjacent cumulative amounts. The operating cash flow and cash capex for each cumulative operand come from one filing and one reporting scope. A trailing result requires four contiguous available quarters on the selected scope. A conflict or missing compatible quarter withholds the trailing amount. The balance-sheet method accepts `historical_balance_sheet` as its scope and uses a single statement for each metric. The core database keeps the original backfill candidates and the mapped statement observations.
 
-The qualification applies to reported balance-sheet liquidity, reported debt where supported, and operating cash flow, cash capex, and free cash flow. Revenue and net-income mappings, earnings-based ratios, peer rankings, the funding scenario, and dataset publication remain open parts of v1.2.
+The qualification applies to reported balance-sheet liquidity, reported debt where supported, and operating cash flow, cash capex, and free cash flow. The [financial ratio review](financial_ratios.md) extends this work with qualified revenue, net income, and borrowing-debt ratios. Peer rankings, the funding scenario, and dataset publication remain open parts of v1.2.
 
 ## Reproduce locally
 

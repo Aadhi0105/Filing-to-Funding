@@ -14,7 +14,14 @@ BEGIN
         JOIN raw.source_fetches AS source ON source.fetch_id = fact.source_fetch_id
         WHERE fact.taxonomy = 'filing-statement-v1' AND source.source_kind = 'sec_filing'
           AND source.retrieved_at IS NOT NULL AND fact.reported_decimals IS NOT NULL
-    ) <> 79 OR (SELECT count(*) FROM core.reported_facts WHERE taxonomy = 'filing-statement-v1') <> 689 THEN
+    ) <> 79 OR (
+        SELECT count(*) FROM core.reported_facts WHERE taxonomy = 'filing-statement-v1'
+          AND concept IN (
+              'current_assets', 'current_liabilities', 'cash_and_equivalents', 'short_term_debt',
+              'noncurrent_debt', 'current_portion_long_term_debt', 'finance_lease_liabilities',
+              'operating_cash_flow', 'cash_capex_outflow'
+          )
+    ) <> 689 THEN
         RAISE EXCEPTION 'The frozen statement capture or source lineage is incomplete';
     END IF;
 
