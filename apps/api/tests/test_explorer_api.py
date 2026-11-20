@@ -27,9 +27,9 @@ class ExplorerAPIIntegration(unittest.TestCase):
 
     def test_catalog_and_response_contract(self):
         catalog = self.get("datasets")
-        self.assertEqual(catalog["active_version"], "v0003")
+        self.assertIn(catalog["active_version"], {entry["version"] for entry in catalog["versions"]})
         companies = self.get("companies")
-        self.assertEqual({item["ticker"] for item in companies["companies"]}, {"DOV", "ITW", "ROK"})
+        self.assertEqual({item["ticker"] for item in companies["companies"]}, {"DOV", "ITW", "ROK", "AOS", "IEX", "LECO"})
         contract = self.client.get("/openapi.json").json()
         self.assertIn("text/csv", contract["paths"]["/api/v1/companies/{cik}/export.csv"]["get"]["responses"]["200"]["content"])
         self.assertEqual(self.client.post("/api/v1/companies").status_code, 405)
@@ -59,7 +59,8 @@ class ExplorerAPIIntegration(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/companies", params={"expected_dataset_version": "v0002"}).status_code, 409)
 
     def test_export_matches_exact_values_and_context(self):
-        args = {"fiscal_year": 2026, "quarter": 2, "mode": "filed_by", "filed_by": "2026-08-06", "expected_dataset_version": "v0003"}
+        args = {"fiscal_year": 2026, "quarter": 2, "mode": "filed_by", "filed_by": "2026-08-06",
+                "expected_dataset_version": self.get("datasets")["active_version"]}
         prefix = "companies/0000049826"
         analysis = self.get(f"{prefix}/analysis", **args)
         result = self.client.get(f"/api/v1/{prefix}/export.csv", params=args)

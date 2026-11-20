@@ -26,7 +26,8 @@ test("shows the audited quarter and downloads the same chart and table data", as
   const chart = lines.findLast((row) => row[0] === "free_cash_flow_history");
   expect(table?.slice(4, 10)).toEqual(["free_cash_flow", "USD", "631000000", "available", "2026-04-01", "2026-06-30"]);
   expect(chart?.slice(4, 10)).toEqual(table?.slice(4, 10));
-  expect(chart?.[13]).toBe("v0003");
+  const catalog = await page.request.get("/api/v1/datasets");
+  expect(chart?.[13]).toBe((await catalog.json()).active_version);
   expect(chart?.[15]).toBe("latest");
   await expect(page.locator("#filing-evidence").getByRole("link").first()).toHaveAttribute("href", /https:\/\/www\.sec\.gov\/Archives\/edgar\/data\//);
 });

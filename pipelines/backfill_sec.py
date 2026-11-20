@@ -238,7 +238,7 @@ def financial_facts(document, filings, first_end):
             }
 
 
-def build_batch(sources):
+def build_batch(sources, issuers=None):
     by_url = {source["source_url"]: source for source in sources}
     if len(by_url) != len(sources):
         raise ValueError("Duplicate EDGAR source URL in the capture")
@@ -252,7 +252,8 @@ def build_batch(sources):
         return source, read_archive(source)
 
     batch = []
-    for cik, ticker, legal_name, year_end, first_year in ISSUERS:
+    issuers = ISSUERS if issuers is None else issuers
+    for cik, ticker, legal_name, year_end, first_year in issuers:
         metadata, submissions = read_source(cik, "sec_submissions", endpoint(cik, "sec_submissions"))
         facts_source, company_facts = read_source(cik, "sec_company_facts", endpoint(cik, "sec_company_facts"))
         if str(submissions["cik"]).zfill(10) != cik or str(company_facts["cik"]).zfill(10) != cik:
