@@ -60,8 +60,10 @@ BEGIN
     END IF;
 
     SELECT yield_percent INTO STRICT observed
-    FROM core.treasury_yield_observations
+    FROM core.treasury_yield_observations AS observation
+    JOIN raw.source_fetches AS source ON source.fetch_id = observation.source_fetch_id
     WHERE observation_date = DATE '2024-10-24' AND maturity_months = 120
+      AND source.source_kind = 'treasury_yield_review'
       AND source_published_at IS NULL;
     IF observed <> 4.21 THEN
         RAISE EXCEPTION 'The 10-year Treasury sample was rounded or given an invented publication time';
