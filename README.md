@@ -6,7 +6,7 @@ Filing-to-Funding uses regulatory filings to show how companies' cash, debt, wor
 
 **Project status:** Local PostgreSQL holds 1,044 qualified statement observations from 79 SEC filings across Illinois Tool Works, Dover, and Rockwell Automation. The historical results include liquidity, annual, quarterly and trailing cash flow, FCF margin, cash conversion, and borrowing-debt ratios where the lease basis is verified. The three-company correctness gate passed, and `v0003` is the active local snapshot.
 
-[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md) · [Financial ratios](docs/financial_ratios.md) · [Treasury history](docs/treasury_history.md) · [Funding calculator](docs/funding_scenario.md) · [Local dataset publication](docs/local_dataset_publication.md) · [G2 correctness review](docs/correctness_review.md)
+[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md) · [Financial ratios](docs/financial_ratios.md) · [Treasury history](docs/treasury_history.md) · [Funding calculator](docs/funding_scenario.md) · [Local dataset publication](docs/local_dataset_publication.md) · [G2 correctness review](docs/correctness_review.md) · [Run the local Company Explorer](docs/company_explorer.md)
 
 ## What the application will do
 
@@ -87,7 +87,8 @@ The layout above includes planned components. Run and test the database with the
 11. **Build the funding scenario calculator — complete.** Calculate signed interest changes and optional illustrative coupons from explicit inputs.
 12. **Publish versioned datasets locally — complete.** Validate candidates, preserve the last good version on refresh failure, and replay archived versions.
 13. **Close the G2 correctness gate — complete.** The [correctness review](docs/correctness_review.md) records the validated local snapshot, filing lineage, temporal checks, and refresh recovery.
-14. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
-15. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
+14. **Build and verify the local Company Explorer — complete.** The three-company slice includes the read-only API, historical modes, filing evidence, and matching CSV exports.
+15. **Complete the six-company web app.** Qualify three issuers and add Overview, Peer Comparison, Funding Scenarios, and Data Quality & Filing History.
+16. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
 
 Financial verification will use independently checked SEC filing examples for real reporting cases and synthetic fixtures for edge cases. The test plan covers amendments, missing quarters, different fiscal calendars, incompatible reporting bases, and interrupted refreshes.
