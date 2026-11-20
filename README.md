@@ -6,7 +6,7 @@ Filing-to-Funding uses regulatory filings to show how companies' cash, debt, wor
 
 **Project status:** Local PostgreSQL holds 1,044 qualified statement observations from 79 SEC filings across Illinois Tool Works, Dover, and Rockwell Automation. The historical results include liquidity, quarterly and trailing cash flow, FCF margin, cash conversion, and borrowing-debt ratios where the lease basis is verified.
 
-[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md) · [Financial ratios](docs/financial_ratios.md)
+[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md) · [Financial ratios](docs/financial_ratios.md) · [Treasury history](docs/treasury_history.md)
 
 ## What the application will do
 
@@ -83,8 +83,9 @@ The layout above includes planned components. Run and test the database with the
 7. **Verify live sources and backfill — complete for the three-company filing window.** The original downloads, accession inventory, and repeatable import are documented.
 8. **Qualify historical liquidity and cash flow — complete for the reviewed scope.** Filing-level evidence supports historical balances, standalone quarters, and compatible trailing results.
 9. **Complete the financial ratios — complete for the reviewed scope.** Qualify revenue and net income, calculate FCF margin and cash conversion, and publish borrowing-debt ratios where the filing supports the basis.
-10. **Close correctness for Treasury, funding scenarios, and dataset publication.** Verify those features against the v1.2 stage gates.
-11. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
-12. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
+10. **Backfill Treasury history — complete for the pilot window.** Archive the 2-, 5-, and 10-year par curves, and show the observation date, age, and vintage status.
+11. **Close correctness for funding scenarios and dataset publication.** Verify those features against the v1.2 stage gates.
+12. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
+13. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
 
 Financial verification will use independently checked SEC filing examples for real reporting cases and synthetic fixtures for edge cases. The test plan covers amendments, missing quarters, different fiscal calendars, incompatible reporting bases, and interrupted refreshes.
