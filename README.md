@@ -4,9 +4,9 @@
 
 Filing-to-Funding uses regulatory filings to show how companies' cash, debt, working capital, and operating cash flow change over time. It is designed for analysts who need to compare companies, check how a metric was calculated, and reconstruct what had been disclosed by a specific date.
 
-**Project status:** The v1.2 architecture is finalized. The local PostgreSQL backfill for Illinois Tool Works, Dover, and Rockwell Automation covers 66 base filings, 12 opening inputs, one amendment, and 2,273 candidate financial observations. The reviewed pilot supports its reconciled calculations and 15 Treasury yields. The next milestone is to qualify the historical mappings and verify cross-period calculations.
+**Project status:** The local PostgreSQL database covers 79 SEC accessions across Illinois Tool Works, Dover, and Rockwell Automation. The historical review qualified 689 statement observations for reported liquidity and cash flow, and verified cutoff-aware quarterly and trailing calculations. Debt coverage and accounting transitions are documented by filing.
 
-[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md)
+[v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md)
 
 ## What the application will do
 
@@ -77,10 +77,11 @@ The layout above includes planned components. Run and test the database with the
 1. **Select the pilot companies — complete.** The coverage matrix records the evidence and known comparison issues for Illinois Tool Works, Dover, and Rockwell Automation. Automated SEC tag coverage and the full filing and amendment inventory are still open.
 2. **Record expected values from the filings — complete.** The reconciliation records balance-sheet and cash-flow examples, including a later disclosure that changed the reporting scope.
 3. **Set up the local PostgreSQL model — complete.** Store fiscal periods, filing metadata, versioned financial observations, Treasury rates, and source references.
-4. **Load the pilot data — complete.** Import the reviewed SEC and Treasury extracts, preserve their source evidence, and verify that replay adds no duplicates. Automated retrieval remains open.
+4. **Load the pilot data — complete.** Import the reviewed SEC and Treasury extracts, preserve their source evidence, and verify that replay adds no duplicates.
 5. **Verify calculations and historical cutoffs — complete.** Reconcile quarterly cash flow, working capital, and debt. Check that the chosen date excludes later or unverified disclosures.
 6. **Review the pilot — complete.** The local pilot passed for its reviewed sample. The readiness review records the remaining requirements for expansion.
-7. **Verify live sources and backfill — complete for the three-company sample and filing window.** The historical correctness review now covers the tag mappings, reporting scopes, and applicable v1.2 stage gates.
+7. **Verify live sources and backfill — complete for the three-company filing window.** The original downloads, accession inventory, and repeatable import are documented.
+8. **Qualify historical liquidity and cash flow — complete for the reviewed scope.** Filing-level evidence supports historical balances, standalone quarters, and compatible trailing results.
 8. **Expand to six companies and build the web app.** Add the five views, consistent exports, source drilldowns, and accessible charts and tables.
 9. **Prepare the public release.** Verify security, restore and replay, performance, and hosting costs before deployment. Any AI filing assistant is a later extension.
 

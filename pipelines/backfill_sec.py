@@ -116,26 +116,42 @@ def capture(cik, kind, url, retrieved_at, content):
     }
 
 
-def download_capture():
+def sec_contact():
     contact = os.environ.get("SEC_CONTACT_EMAIL", "")
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", contact):
         raise ValueError("Set SEC_CONTACT_EMAIL to an authorized project contact for EDGAR requests")
+    return contact
+
+
+class EdgarDownloadError(ValueError):
+    def __init__(self, url, status):
+        self.status = status
+        super().__init__(f"EDGAR download failed for {url} (HTTP {status or 'unavailable'})")
+
+
+def download_edgar(url, contact, max_bytes):
+    if not url.startswith(("https://data.sec.gov/", "https://www.sec.gov/Archives/edgar/data/")):
+        raise ValueError("EDGAR downloads require an official SEC source URL")
+    with NamedTemporaryFile() as response:
+        request = subprocess.run([
+            "curl", "--disable", "--silent", "--show-error", "--fail",
+            "--retry", "1", "--retry-delay", "2", "--retry-max-time", "50", "--max-time", "35",
+            "--max-filesize", str(max_bytes),
+            "--user-agent", f"Filing-to-Funding {contact}", "--output", response.name,
+            "--write-out", "%{http_code}", url,
+        ], capture_output=True, text=True)
+        if request.returncode:
+            raise EdgarDownloadError(url, request.stdout)
+        return Path(response.name).read_bytes(), datetime.now(timezone.utc).isoformat()
+
+
+def download_capture():
+    contact = sec_contact()
     archives = []
     for cik, *_ in ISSUERS:
         for kind in ("sec_submissions", "sec_company_facts"):
             url = endpoint(cik, kind)
-            with NamedTemporaryFile() as response:
-                request = subprocess.run([
-                    "curl", "--disable", "--silent", "--show-error", "--fail",
-                    "--retry", "2", "--retry-max-time", "50", "--max-time", "35",
-                    "--max-filesize", str(MAX_BYTES),
-                    "--user-agent", f"Filing-to-Funding {contact}", "--output", response.name,
-                    "--write-out", "%{http_code}", url,
-                ], capture_output=True, text=True)
-                if request.returncode:
-                    raise ValueError(f"EDGAR download failed for {url} (HTTP {request.stdout or 'unavailable'})")
-                fetched = datetime.now(timezone.utc).isoformat()
-                content = Path(response.name).read_bytes()
+            content, fetched = download_edgar(url, contact, MAX_BYTES)
             archives.append(capture(cik, kind, url, fetched, content))
             time.sleep(0.5)
     return archives

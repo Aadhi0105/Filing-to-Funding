@@ -1,4 +1,4 @@
-CREATE FUNCTION analytics.pilot_facts(
+CREATE OR REPLACE FUNCTION analytics.pilot_facts(
     p_cik text,
     p_period_start date,
     p_period_end date,
@@ -22,7 +22,7 @@ AS $function$
         FROM core.reported_facts AS fact
         JOIN core.filings AS filing USING (accession)
         WHERE filing.cik = p_cik
-          AND fact.taxonomy = 'filing-line'
+          AND fact.taxonomy IN ('filing-line', 'filing-statement-v1')
           AND fact.unit = 'USD'
           AND fact.dimensions = '{}'::jsonb
           AND fact.period_start IS NOT DISTINCT FROM p_period_start
