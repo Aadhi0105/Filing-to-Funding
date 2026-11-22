@@ -106,7 +106,8 @@ function downloadCsv(name: string, context: Model["Context"], fields: string[], 
   const details = [context.dataset_version, context.methodology_version, context.mode, context.filed_by, context.filing_cutoff];
   const encode = (value: CsvValue) => {
     const text = String(value ?? "");
-    const formula = /^[\x00-\x20]*[=+@-]/.test(text) && !/^[+-]?\d+(?:\.\d+)?$/.test(text);
+    const formulaPrefix = /^[\x00-\x20]*[=+@\-＝＋＠－]|^[ ]*[\t\n\r]/;
+    const formula = formulaPrefix.test(text) && !/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text);
     return `"${(formula ? "'" + text : text).replaceAll('"', '""')}"`;
   };
   const header = [...fields, "dataset_version", "methodology_version", "mode", "filed_by", "filing_cutoff"];
@@ -432,7 +433,7 @@ export function ResearchWorkspace({ page }: { page: Page }) {
   }
 
   const [title, description] = views[page];
-  return <Workspace route={`/${page}`} version={chosen?.version} query={share ? `?${share}` : undefined}>
+  return <Workspace route={`/${page}`} version={chosen?.version} query={share ? `?${share}` : undefined} catalog={catalog.value}>
     <header className="page-heading"><div><h1>{title}</h1><p>{description}</p></div></header>
     {current && active && <section className="panel controls" aria-label="Reporting filters">
       <div className="controls-row">

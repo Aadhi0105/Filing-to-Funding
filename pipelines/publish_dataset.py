@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -55,6 +56,10 @@ SELECT json_build_object(
     )
 );
 """
+
+
+class PublicationBusy(ValueError):
+    """Another operation owns the local dataset catalog."""
 
 
 def canonical(value):
@@ -276,17 +281,23 @@ def snapshot_details(directory, snapshot_id):
     return folder, details
 
 
-def publish(directory, manifests):
+@contextmanager
+def publication_lock(directory):
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / "publish.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise ValueError("A dataset refresh is already running") from None
+            raise PublicationBusy("A dataset refresh is already running") from None
+        yield
+
+
+def publish(directory, manifests):
+    with publication_lock(directory):
         return publish_locked(directory, manifests)
 
 
-def publish_locked(directory, manifests):
+def publish_locked(directory, manifests, *, prepare=None):
     catalog = read_catalog(directory)
     active = catalog_entry(catalog) if catalog["active_version"] else None
     captures = {name: path.read_bytes() for name, path in manifests.items()}
@@ -301,9 +312,13 @@ def publish_locked(directory, manifests):
     }
     snapshot_id = digest(identity)
     if active:
-        _, previous = snapshot_details(directory, active["snapshot_id"])
         if active["snapshot_id"] == snapshot_id:
+            _, details = snapshot_details(directory, snapshot_id)
+            if prepare:
+                prepare(directory, active, details)
             return "already_active", active
+        # A rollback changes what readers see. It must not lower the ingestion watermark.
+        _, previous = snapshot_details(directory, catalog["versions"][-1]["snapshot_id"])
         require_current_sources(previous["source_watermarks"], watermarks)
     if any(entry["snapshot_id"] == snapshot_id for entry in catalog["versions"]):
         raise ValueError("This dataset version has already been superseded")
@@ -334,6 +349,8 @@ def publish_locked(directory, manifests):
         "published_at": datetime.now(timezone.utc).isoformat(), "row_counts": details["row_counts"],
         "sec_filing_cutoff": details["sec_filing_cutoff"], "treasury_window": details["treasury_window"],
     }
+    if prepare:
+        prepare(directory, record, details)
     catalog["versions"].append(record)
     catalog["active_version"] = record["version"]
     write_json(directory / "catalog.json", catalog)
@@ -347,9 +364,13 @@ def restore_dump(folder, database):
 
 
 def restore(directory, version, database):
+    record = catalog_entry(read_catalog(directory), version)
+    return restore_record(directory, record, database)
+
+
+def restore_record(directory, record, database):
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", database):
         raise ValueError("Use a new PostgreSQL database name made of lowercase letters, numbers, and underscores")
-    record = catalog_entry(read_catalog(directory), version)
     folder, details = snapshot_details(directory, record["snapshot_id"])
     run(tool_command("createdb", "--template=template0", database))
     try:

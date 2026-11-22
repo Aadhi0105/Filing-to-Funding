@@ -2,20 +2,30 @@
 
 import csv
 import io
+import os
 from datetime import date, datetime
 from decimal import Context as DecimalContext, Decimal, localcontext
 from typing import Annotated, Literal
 
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from apps.api import company_data as company, research
-from apps.api.dataset_access import Duration, Mode, catalog_datasets, reader
+from apps.api.dataset_access import DATASETS, Duration, Mode, catalog_datasets, reader
 from apps.api.funding_scenario import CALCULATION_PRECISION, calculate_funding_scenario, decimal_string
+from apps.api.public_boundary import PublicBoundary, csv_cell
+from pipelines import refresh_dataset
 
-app = FastAPI(title="Filing-to-Funding API", version="1.0.0")
+public = os.environ.get("FILING_API_PUBLIC") == "1"
+app = FastAPI(
+    title="Filing-to-Funding API", version="1.0.0",
+    docs_url=None if public else "/docs", redoc_url=None if public else "/redoc",
+    openapi_url=None if public else "/openapi.json",
+)
+app.add_middleware(PublicBoundary)
 API = "/api/v1"
 CIK = Annotated[str, Path(pattern=r"^[0-9]{10}$")]
 
@@ -33,9 +43,22 @@ class DatasetRecord(BaseModel):
     row_counts: dict[str, int]
 
 
+class RefreshStatus(BaseModel):
+    source_status: Literal["unknown", "running", "ok", "review_required", "failed", "overdue"]
+    source_attempt_at: datetime | None
+    source_success_at: datetime | None
+    source_check_overdue: bool
+    publication_status: Literal["unknown", "running", "ok", "failed"]
+    publication_attempt_at: datetime | None
+    publication_success_at: datetime | None
+    filing_coverage_stale: bool
+    treasury_coverage_stale: bool
+
+
 class DatasetList(BaseModel):
     active_version: str
     versions: list[DatasetRecord]
+    refresh: RefreshStatus
 
 
 class Context(BaseModel):
@@ -150,7 +173,7 @@ def current_catalog():
         active, versions = catalog_datasets()
     except (OSError, ValueError, KeyError) as error:
         raise HTTPException(503, "The local dataset catalog could not be read") from error
-    if active is None or not versions:
+    if not any(record.version == active for record in versions):
         raise HTTPException(503, "No local dataset is published")
     return active, versions
 
@@ -187,10 +210,24 @@ async def unavailable(_: Request, error: Exception):
     return JSONResponse(status_code=503, content={"detail": "The selected local dataset is unavailable"})
 
 
+@app.exception_handler(RequestValidationError)
+async def invalid_request(_: Request, error: RequestValidationError):
+    details = [
+        {"loc": item["loc"][:1] if item["type"] == "extra_forbidden" else item["loc"],
+         "msg": item["msg"], "type": item["type"]}
+        for item in error.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": details})
+
+
 @app.get(f"{API}/datasets", response_model=DatasetList)
 def datasets():
     active, versions = current_catalog()
-    return {"active_version": active, "versions": versions}
+    current = next(record for record in versions if record.version == active)
+    return {
+        "active_version": active, "versions": versions,
+        "refresh": refresh_dataset.health(DATASETS, current.filing_cutoff, current.treasury_end),
+    }
 
 
 @app.get(f"{API}/companies", response_model=CompanyList)
@@ -244,7 +281,7 @@ def export(result: Annotated[Analysis, Depends(analysis_request)]):
         for row in rows:
             values = row.model_dump()
             number = values["value"]
-            writer.writerow((
+            writer.writerow(map(csv_cell, (
                 section, result.company.cik, result.company.ticker, result.duration,
                 values.get("metric", "free_cash_flow"), values.get("unit", "USD"),
                 format(number, "f") if number is not None else None, values["status"],
@@ -252,7 +289,7 @@ def export(result: Annotated[Analysis, Depends(analysis_request)]):
                 values["scope_key"], "|".join(values["source_accessions"]),
                 context.dataset_version, context.methodology_version, context.mode,
                 context.filed_by, context.filing_cutoff,
-            ))
+            )))
     return Response(
         output.getvalue(), media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{result.company.cik}-{context.dataset_version}.csv"'},
@@ -334,6 +371,8 @@ ScenarioDecimal = Annotated[str, StringConstraints(min_length=1, max_length=128)
 
 
 class ScenarioInputs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     principal_usd: ScenarioDecimal
     repricing_share: ScenarioDecimal
     shock_bps: ScenarioDecimal

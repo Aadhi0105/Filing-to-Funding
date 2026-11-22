@@ -12,6 +12,25 @@ async function exportRows(page: Page) {
 
 const filedBy = "mode=filed_by&filed_by=2026-11-19";
 
+test("keeps verified financial data visible when the source check fails", async ({ page }) => {
+  await page.route("**/api/v1/datasets", async (route) => {
+    const response = await route.fetch();
+    const catalog = await response.json();
+    await route.fulfill({ response, json: { ...catalog, refresh: {
+      ...catalog.refresh, source_status: "failed", treasury_coverage_stale: true,
+    } } });
+  });
+  await page.goto("/overview");
+  const notice = page.getByRole("status").filter({ hasText: /Showing verified dataset v0004/ });
+  await expect(notice).toContainText("The last source check failed.");
+  await expect(notice).toContainText("Treasury coverage ends Nov 19, 2026.");
+  await expect(page.getByRole("article").filter({ hasText: "A. O. Smith" })).toContainText("$162.9M");
+
+  await page.goto("/overview?mode=platform_snapshot&dataset_version=v0003");
+  await expect(page.getByText("Archived dataset v0003")).toBeVisible();
+  await expect(notice).toHaveCount(0);
+});
+
 test("exports the same overview, peer, and filing rows with the selected cutoff", async ({ page }) => {
   await page.goto(`/overview?${filedBy}`);
   await expect(page.getByRole("article").filter({ hasText: "A. O. Smith" })).toContainText("$162.9M");
