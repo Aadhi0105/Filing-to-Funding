@@ -31,6 +31,8 @@ h1,h2,p { margin: 0; }
 .dataset-badge { display: flex; gap: 7px; align-items: center; padding: 6px 10px; border: 1px solid #cde9e1; border-radius: 999px; color: #145e54; background: #edf8f5; font-size: .82rem; font-weight: 650; white-space: nowrap; }
 .dataset-badge i { display: inline-block; background: #0b8a76; width: 7px; height: 7px; border-radius: 50%; }
 .content { max-width: 1270px; margin: 0 auto; padding: 28px 32px 48px; }
+.refresh-notice { display: flex; align-items: start; gap: 10px; margin: 0 0 18px; padding: 11px 14px; border: 1px solid #e9d3a0; border-radius: 8px; background: #fffaea; color: #5e440c; font-size: .88rem; line-height: 1.5; }
+.refresh-notice svg { flex: none; margin-top: 2px; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; }
 .page-heading h1 { font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 730; letter-spacing: -.045em; line-height: 1.15; }
 .page-heading p { color: var(--muted); margin-top: 8px; }

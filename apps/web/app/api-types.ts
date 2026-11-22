@@ -287,6 +287,7 @@ export interface components {
             active_version: string;
             /** Versions */
             versions: components["schemas"]["DatasetRecord"][];
+            refresh: components["schemas"]["RefreshStatus"];
         };
         /** DatasetRecord */
         DatasetRecord: {
@@ -528,6 +529,33 @@ export interface components {
             scope_key: string;
             /** Source Accessions */
             source_accessions: string[];
+        };
+        /** RefreshStatus */
+        RefreshStatus: {
+            /**
+             * Source Status
+             * @enum {string}
+             */
+            source_status: "unknown" | "running" | "ok" | "review_required" | "failed" | "overdue";
+            /** Source Attempt At */
+            source_attempt_at: string | null;
+            /** Source Success At */
+            source_success_at: string | null;
+            /** Source Check Overdue */
+            source_check_overdue: boolean;
+            /**
+             * Publication Status
+             * @enum {string}
+             */
+            publication_status: "unknown" | "running" | "ok" | "failed";
+            /** Publication Attempt At */
+            publication_attempt_at: string | null;
+            /** Publication Success At */
+            publication_success_at: string | null;
+            /** Filing Coverage Stale */
+            filing_coverage_stale: boolean;
+            /** Treasury Coverage Stale */
+            treasury_coverage_stale: boolean;
         };
         /** Revision */
         Revision: {

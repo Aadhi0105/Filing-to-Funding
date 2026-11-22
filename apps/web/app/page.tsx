@@ -211,7 +211,7 @@ export default function Explorer() {
   }
 
   return (
-    <Workspace route="/" version={result?.context.dataset_version || active?.version}
+    <Workspace route="/" version={result?.context.dataset_version || active?.version} catalog={catalog}
       query={controls.mode === "filed_by" && controls.filedBy
         ? `?mode=filed_by&filed_by=${controls.filedBy}`
         : controls.mode === "platform_snapshot" && (controls.version || active?.version)
