@@ -13,6 +13,7 @@ MAX_BODY_BYTES = 4096
 MAX_QUERY_BYTES = 2048
 MAX_PATH_CHARS = 512
 BODY_TIMEOUT_SECONDS = 5
+FUNDING_SCENARIO_PATH = "/api/v1/funding/scenario"
 SIGNED_DECIMAL = re.compile(r"[+-]?[0-9]+(?:\.[0-9]+)?\Z")
 FORMULA_PREFIX = re.compile(r"^[\x00-\x20]*[=+@\-＝＋＠－]|^[ ]*[\t\n\r]")
 
@@ -36,10 +37,10 @@ class RejectedRequest(Exception):
         self.status = status
 
 
-def check_request(scope: Scope):
+def check_request(scope: Scope, expects_json: bool):
     if len(scope["path"]) > MAX_PATH_CHARS or len(scope["query_string"]) > MAX_QUERY_BYTES:
         raise RejectedRequest(414, "Request URL is too long.")
-    if scope["method"] != "POST":
+    if not expects_json:
         return
 
     body_headers = {}
@@ -123,8 +124,9 @@ class PublicBoundary:
             response = JSONResponse({"detail": detail}, status_code=status, headers=headers)
             await response(scope, receive, secure_send)
 
+        expects_json = scope["method"] == "POST" and scope["path"] == FUNDING_SCENARIO_PATH
         try:
-            check_request(scope)
+            check_request(scope, expects_json)
         except RejectedRequest as error:
             await reject(error.status, str(error))
             return
@@ -135,7 +137,7 @@ class PublicBoundary:
             return
 
         try:
-            if scope["method"] != "POST":
+            if not expects_json:
                 await self.app(scope, receive, secure_send)
                 return
             try:

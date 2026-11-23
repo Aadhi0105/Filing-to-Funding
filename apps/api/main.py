@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from apps.api import company_data as company, research
 from apps.api.dataset_access import DATASETS, Duration, Mode, catalog_datasets, reader
 from apps.api.funding_scenario import CALCULATION_PRECISION, calculate_funding_scenario, decimal_string
-from apps.api.public_boundary import PublicBoundary, csv_cell
+from apps.api.public_boundary import FUNDING_SCENARIO_PATH, PublicBoundary, csv_cell
 from pipelines import refresh_dataset
 
 public = os.environ.get("FILING_API_PUBLIC") == "1"
@@ -455,7 +455,7 @@ def market_rates(curve_date: date | None = None, selected=Depends(selection)):
         return {"context": context, "curve": research.treasury_curve(connection, cutoff)}
 
 
-@app.post(f"{API}/funding/scenario", response_model=Scenario)
+@app.post(FUNDING_SCENARIO_PATH, response_model=Scenario)
 def funding_scenario(inputs: ScenarioInputs, selected=Depends(selection)):
     dataset, context = selected
     curve = None
