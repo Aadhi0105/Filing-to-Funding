@@ -111,6 +111,9 @@ class PublicSurface(unittest.TestCase):
             self.assertNotIn("sample-private", response.text)
             denied = client.post("/api/v1/refresh", json={})
             self.assertEqual(denied.status_code, 404)
+            unsupported = client.post("/api/v1/companies")
+            self.assertEqual(unsupported.status_code, 405)
+            self.assertIn("GET", unsupported.headers["allow"])
 
     def test_export_protects_text_and_preserves_signed_values(self):
         for value in ("=1+1", "  +example", "@example", "\ttext", "\ntext", "＝example"):
