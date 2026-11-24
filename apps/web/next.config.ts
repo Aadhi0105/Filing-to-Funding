@@ -40,10 +40,12 @@ const config: NextConfig = {
         origin.pathname !== "/" || origin.search || origin.hash) {
       throw new Error("FILING_API_ORIGIN must be an HTTP or HTTPS origin without credentials, parameters, or a path.");
     }
-    if (process.env.VERCEL_ENV === "production" && (!configured || origin.protocol !== "https:")) {
-      throw new Error("Set the production FILING_API_ORIGIN to the HTTPS API origin.");
+    if (process.env.VERCEL_ENV === "production" && (!configured || origin.protocol !== "https:" ||
+        !process.env.FILING_GCP_WIF_PROVIDER || !process.env.FILING_GCP_INVOKER_ACCOUNT)) {
+      throw new Error("Configure the private HTTPS origin and its Google Cloud identity before a production build.");
     }
-    return [{ source: "/api/v1/:path*", destination: `${origin.origin}/api/v1/:path*` }];
+    if (process.env.FILING_GCP_WIF_PROVIDER) return [];
+    return { beforeFiles: [{ source: "/api/v1/:path*", destination: `${origin.origin}/api/v1/:path*` }] };
   },
 };
 export default config;

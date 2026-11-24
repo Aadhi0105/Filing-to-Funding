@@ -1,6 +1,6 @@
 # Module 4.4 performance and release readiness
 
-**Local rehearsal passed on 23 November 2026. Hosted G4 sign-off remains pending.** The tested release was the restored six-company dataset **v0004**, with SEC and Treasury coverage through **19 November 2026**. The rehearsal used a local Next.js production build in Docker, one FastAPI process, and an isolated PostgreSQL 17.12 instance.
+**Phase 5.1 was published and verified on 24 November 2026.** The local rehearsal passed on 23 November, and the private hosted rehearsal passed on 24 November. The tested release was the restored six-company dataset **v0004**, with SEC and Treasury coverage through **19 November 2026**. The rehearsal used a local Next.js production build in Docker, one FastAPI process, and an isolated PostgreSQL 17.12 instance.
 
 ## Correctness and recovery
 
@@ -35,13 +35,55 @@ For the hosted rehearsal, use the approved HTTPS origin and record the source re
 
 ## Hosted sign-off
 
-The Vercel project had zero deployments at inspection. The default Supabase database had zero application schemas. The rehearsal needs a Cloud Run target, the TLS-enabled hosted database and catalog, and the private artifact store specified in the hosting plan.
+On 24 November 2026, the protected Vercel preview loaded all six companies in **v0004**, replayed the three-company **v0003** archive, and calculated **$250,000.00** of incremental annual interest for the default sample scenario. The preview used a workspace-scoped Vercel identity to invoke the private Cloud Run service. An anonymous Vercel API request redirected to sign-in. [Private Vercel preview](https://filing-to-funding-g38fciq55-psat0501-5187.vercel.app/overview) · [Hosting and budget](hosting_and_budget.md)
 
-| Gate | Evidence to collect |
+| Gate | Evidence from the private hosted rehearsal |
 | --- | --- |
-| Performance and budget | Benchmark through Vercel and the Cloud Run origin. Record cold-start timings, runtime and database connection usage, storage and egress, and observed costs against the approved plan. |
-| Refresh and availability | Verify a scheduled SEC and Treasury check, simulate a failed check, confirm alert delivery, and confirm v0004 remains available until a reviewed release is published. |
-| Recovery and rollback | Recover the active release and a retained version from private Cloud Storage. Verify checksums, row counts, and historical query results. Record the recovery point and recovery time, and verify rollback through the hosted API. |
-| Security and release | Verify the hosted reader and ingestion identities, the Supabase Data API boundary, preview credential separation, and effective request limits. Review the combined evidence before approving public publication. |
+| Performance | All **72 measured browser flows** returned the expected v0004 data or the expected calculator result. The slowest warm p95 was **1.052 s**. The earlier private Cloud Run Overview measured **0.905 s p95** over 12 requests. The earlier 24-hour Cloud Monitoring sample had two starts averaging **5.49 s**, 48 API requests, and 25.2 billable instance seconds. PostgreSQL showed two reader sessions out of 60 configured server connections in a point-in-time check. This is a low-load rehearsal. |
+| Budget | Google Cloud Billing showed **₹0.00** posted for the November 1–23 charge period when checked on 24 November. Late usage can post after the report. The trial showed **₹28,569** in remaining credit. The Vercel Hobby Usage dashboard showed **41 of 1,000,000** included function invocations at the time of inspection. Supabase Free hosted **54.8 MiB** across five connectable databases, including provider schemas. The updated Google Cloud model remains below **$5/month** at the planned workload. |
+| Refresh and availability | The hosted source job archived six SEC responses and one Treasury response. The clock-triggered and duplicate-skip rehearsals passed. The forced failure preserved the last success timestamp and v0004 and delivered a test notification. The hourly watchdog read the live timestamp successfully and delivered the 36-hour alert to the internal subscription using an isolated timestamp **36 hours and 1 second** old. |
+| Recovery and rollback | All four backups restored locally and passed 31 API tests. The isolated Cloud Run recovery job restored v0003 and v0004 with matching hashes and counts in **5.83 seconds**. A separate hosted catalog and zero-traffic revision served **v0004 (6 companies) → v0003 (3) → v0004 (6)**. A stale version pin returned **409** and v0003 remained replayable. The live API stayed on v0004. The temporary drill route was removed and the normal service template restored. |
+| Security | The unused Supabase Data API was disabled with the owner's approval. The setting persisted after reload, and the private preview still served all six companies. Supabase Security Advisor returned no findings. Anonymous and authenticated database roles had no access to either catalog. The reader had SELECT only, the source checker could update refresh status only, and the snapshot publisher could no longer sign in. Direct Cloud Run returned **403** without authorization. The serving revision uses the exact Vercel Preview identity, enforced TLS, two instances maximum, and four concurrent requests per instance. The hosted API disabled docs and OpenAPI, rejected oversized query strings and bodies, and sent `no-store` and `nosniff`. |
+
+### Warm browser timings
+
+Chrome exercised the signed-in Vercel Preview deployment in one session. Each flow ran three warmups followed by 12 sequential measured operations. GET timing includes browser navigation and reading the pinned v0004 JSON response. Calculator timing includes the time from submitting each test input until the expected result appeared on screen. Values use nearest-rank p95. Cold start and concurrent public traffic need separate checks.
+
+| Flow | p95 |
+| --- | ---: |
+| Overview | 1,052 ms |
+| Company Explorer | 832 ms |
+| Peer Comparison | 901 ms |
+| Filing History | 856 ms |
+| Treasury curve | 635 ms |
+| Funding Scenario | 620 ms |
+
+### Production credential cutover
+
+On 24 November, the API, source check, and watchdog moved to separate expiring runtime logins. Both private API origins served the four snapshots, and unauthorized requests to each returned HTTP 403. The protected Preview showed v0004 and produced **$250,000.00** of incremental interest for the default funding scenario after the credential switch. The source-check and watchdog jobs completed with their new credentials. The temporary logins and their Secret Manager versions were disabled. A local Next.js Production build passed and registered the server-side API route. Vercel had no ready Production deployment. The first rotation is due by **23 January 2027**, ahead of expiry at **05:14 IST on 22 February 2027**. [Credential rotation](security_and_access.md#hosted-credential-rotation)
+
+## Phase 5.1 production release
+
+The owner approved publication on **24 November 2026**. Vercel Production deployed the verified 22-file web source bundle to the project domain. The release uses the Production-only Vercel workload identity and private Cloud Run revision `ftf-api-production-00001-m89` in Northern Virginia. Deployment `dpl_4Yv3swsDC7nTXjmxSPZ38dTDgUhP` built from the reviewed local source with bundle SHA-256 `6b25944b511ed4dc96b1581cca7b3949a305ad8aaf07f2b0e29f06b4de5f3b61`. [Live demo](https://filing-to-funding.vercel.app/overview) · [Vercel deployment](https://vercel.com/psat0501-5187/filing-to-funding/4Yv3swsDC7nTXjmxSPZ38dTDgUhP)
+
+| Release check | Observed result |
+| --- | --- |
+| Public access and workload identity | The branded HTTPS domain returned HTTP 200 without sign-in. The public API retrieved v0004 data through the Vercel identity. The direct Cloud Run origin denied anonymous access with HTTP 403. |
+| Browser and history | All five public views loaded. Overview showed six companies, replayed the three-company v0003 archive, and returned to v0004. Anonymous API requests replayed all four versions and returned six companies on the 19 November filed-by cutoff. |
+| Calculation and export | The default funding scenario returned **$250,000.00** in incremental interest. The company export returned a **21-row CSV attachment** pinned to v0004. |
+| Request bounds | The public edge returned HTTP 409 for a stale version pin, 414 for an oversized URL, 413 for an oversized request body, 415 for an unsupported body type, and 404 for the unpublished OpenAPI route. The response security headers passed. The seven local API boundary tests also passed, including HTTP 429, Retry-After, and request body deadlines. |
+| Warm performance | All **120** measured Vercel-to-Cloud Run requests passed with zero errors, using 20 requests per endpoint after three warmups, at up to two requests per second and two in flight from India. Every warm p95 was below two seconds. |
+| Refresh | The source checker flagged newer Treasury coverage for review. The public app continued to serve the last verified dataset, v0004. |
+
+| Public endpoint | Warm p95 |
+| --- | ---: |
+| Overview | 772.0 ms |
+| Company Explorer | 847.4 ms |
+| Peer Comparison | 713.9 ms |
+| Filing History | 820.9 ms |
+| Treasury curve | 574.7 ms |
+| Funding scenario | 691.4 ms |
+
+**Phase 5.1 is complete.** Keep the scheduled credential rotation and Google Cloud billing reconciliation in routine operations. The next portfolio milestone is 5.2.
 
 [Hosting and budget](hosting_and_budget.md) · [Refresh and recovery](refresh_and_recovery.md) · [Security and access controls](security_and_access.md) · [v1.2 release gates](filing-to-funding-audit-v1.2.md#7-stage-gates-and-evidence-required)

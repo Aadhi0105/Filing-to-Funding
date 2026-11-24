@@ -1,0 +1,6 @@
+**
+!pipelines/
+!pipelines/*.py
+!database/
+!database/tests/
+!database/tests/*.sql

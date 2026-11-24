@@ -106,7 +106,7 @@ def utc_timestamp(value):
     return timestamp.astimezone(timezone.utc).isoformat()
 
 
-def capture(cik, kind, url, retrieved_at, content):
+def capture(cik, kind, url, retrieved_at, content, *, archive=archive_payload):
     # Reject an HTML access block or partial response before adding it to the archive.
     json.loads(content)
     timestamp = utc_timestamp(retrieved_at)
@@ -114,7 +114,7 @@ def capture(cik, kind, url, retrieved_at, content):
         raise ValueError(f"Missing download completion time for {url}")
     return {
         "cik": cik, "source_kind": kind, "source_url": url, "retrieved_at": timestamp,
-        **archive_payload(content, "json"),
+        **archive(content, "json"),
     }
 
 
