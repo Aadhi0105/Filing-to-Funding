@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 
 from pipelines.load_pilot import ROOT
 
-REQUEST_BUDGET = ROOT / ".local/sec-request-budget.lock"
+REQUEST_BUDGET = Path(os.environ.get("FILING_SEC_REQUEST_BUDGET") or ROOT / ".local/sec-request-budget.lock")
 REQUEST_INTERVAL = 0.5
 RETRY_DELAY = 2
 MAX_INLINE_WAIT = 5

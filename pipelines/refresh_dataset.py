@@ -60,9 +60,12 @@ def public_attempt(value, timestamp):
 
 
 def health(directory, filing_cutoff, treasury_end, *, timestamp=None):
+    return health_from_status(read_status(directory), filing_cutoff, treasury_end, timestamp=timestamp)
+
+
+def health_from_status(state, filing_cutoff, treasury_end, *, timestamp=None):
     timestamp = timestamp or now()
     today = timestamp.astimezone(EASTERN).date()
-    state = read_status(directory)
     source_status, source_attempt, source_success = public_attempt(state.get("sources"), timestamp)
     refresh_status, refresh_attempt, refresh_success = public_attempt(state.get("publication"), timestamp)
     return {
@@ -107,7 +110,7 @@ def run_attempt(directory, channel, operation):
         return attempt
 
 
-def check_sec(cutoff):
+def check_sec(cutoff, *, archive=archive_payload):
     contact = sec_contact()
     captures = []
     later = set()
@@ -128,12 +131,12 @@ def check_sec(cutoff):
                 if not re.fullmatch(r"[0-9]{10}-[0-9]{2}-[0-9]{6}", accession):
                     raise ValueError("Invalid accession in SEC response")
                 later.add((cik, accession))
-        fields = backfill_sec.capture(cik, "sec_submissions", url, retrieved_at, content)
+        fields = backfill_sec.capture(cik, "sec_submissions", url, retrieved_at, content, archive=archive)
         captures.append(fields)
     return captures, len(later)
 
 
-def check_treasury(directory, cutoff):
+def check_treasury(directory, cutoff, *, archive=archive_payload):
     today = now().astimezone(EASTERN).date()
     if not 0 <= today.year - cutoff.year <= 1:
         raise ValueError("Treasury source check requires a recent reviewed baseline")
@@ -158,7 +161,7 @@ def check_treasury(directory, cutoff):
         latest = max(curves)
         newest = max(newest, latest) if newest else latest
         captures.append({"year": year, "source_url": url, "retrieved_at": retrieved_at,
-                         **archive_payload(content, "xml")})
+                         **archive(content, "xml")})
     if newest < cutoff:
         raise ValueError("Treasury feed does not reach the published coverage date")
     return captures, newest

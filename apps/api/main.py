@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from apps.api import company_data as company, research
-from apps.api.dataset_access import DATASETS, Duration, Mode, catalog_datasets, reader
+from apps.api.dataset_access import DATASETS, Duration, Mode, catalog_state, reader
 from apps.api.funding_scenario import CALCULATION_PRECISION, calculate_funding_scenario, decimal_string
 from apps.api.public_boundary import FUNDING_SCENARIO_PATH, PublicBoundary, csv_cell
 from pipelines import refresh_dataset
@@ -170,12 +170,12 @@ class Analysis(BaseModel):
 
 def current_catalog():
     try:
-        active, versions = catalog_datasets()
-    except (OSError, ValueError, KeyError) as error:
-        raise HTTPException(503, "The local dataset catalog could not be read") from error
+        active, versions, refresh_status = catalog_state()
+    except (OSError, ValueError, KeyError, TypeError, psycopg.Error) as error:
+        raise HTTPException(503, "The dataset catalog could not be read") from error
     if not any(record.version == active for record in versions):
-        raise HTTPException(503, "No local dataset is published")
-    return active, versions
+        raise HTTPException(503, "No dataset is published")
+    return active, versions, refresh_status
 
 
 def selection(
@@ -184,7 +184,7 @@ def selection(
     dataset_version: Annotated[str | None, Query(pattern=r"^v[0-9]{4,8}$")] = None,
     expected_dataset_version: Annotated[str | None, Query(pattern=r"^v[0-9]{4,8}$")] = None,
 ):
-    active, versions = current_catalog()
+    active, versions, _ = current_catalog()
     if mode == "platform_snapshot":
         if dataset_version is None or filed_by is not None:
             raise HTTPException(422, "Platform snapshot mode requires a version and uses its own methodology")
@@ -207,7 +207,7 @@ def selection(
 @app.exception_handler(OSError)
 @app.exception_handler(ValueError)
 async def unavailable(_: Request, error: Exception):
-    return JSONResponse(status_code=503, content={"detail": "The selected local dataset is unavailable"})
+    return JSONResponse(status_code=503, content={"detail": "The selected dataset is unavailable"})
 
 
 @app.exception_handler(RequestValidationError)
@@ -222,11 +222,13 @@ async def invalid_request(_: Request, error: RequestValidationError):
 
 @app.get(f"{API}/datasets", response_model=DatasetList)
 def datasets():
-    active, versions = current_catalog()
+    active, versions, refresh_status = current_catalog()
     current = next(record for record in versions if record.version == active)
+    if refresh_status is None:
+        refresh_status = refresh_dataset.read_status(DATASETS)
     return {
         "active_version": active, "versions": versions,
-        "refresh": refresh_dataset.health(DATASETS, current.filing_cutoff, current.treasury_end),
+        "refresh": refresh_dataset.health_from_status(refresh_status, current.filing_cutoff, current.treasury_end),
     }
 
 

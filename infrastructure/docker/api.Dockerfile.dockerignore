@@ -1,0 +1,7 @@
+**
+!apps/
+!apps/api/
+!apps/api/*.py
+!apps/api/requirements.lock.txt
+!pipelines/
+!pipelines/*.py

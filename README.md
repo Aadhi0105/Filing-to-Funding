@@ -4,11 +4,11 @@
 
 Filing-to-Funding uses regulatory filings to show how companies' cash, debt, working capital, and operating cash flow change over time. It is designed for analysts who need to compare companies, check how a metric was calculated, and reconstruct what had been disclosed by a specific date.
 
-**Project status:** Local PostgreSQL holds 1,044 qualified statement observations from 79 SEC filings across Illinois Tool Works, Dover, and Rockwell Automation. The historical results include liquidity, annual, quarterly and trailing cash flow, FCF margin, cash conversion, and borrowing-debt ratios where the lease basis is verified. The three-company correctness gate passed, and `v0003` is the active local snapshot.
+**Live demo.** Explore six qualified U.S. industrial companies in the current dataset, `v0004`. The public app includes filing evidence, historical cutoff views, four published snapshots, and a funding scenario calculator. [Open Filing-to-Funding](https://filing-to-funding.vercel.app/overview) · [Release evidence](docs/performance_and_release_readiness.md#phase-51-production-release)
 
 [v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md) · [Financial ratios](docs/financial_ratios.md) · [Treasury history](docs/treasury_history.md) · [Funding calculator](docs/funding_scenario.md) · [Local dataset publication](docs/local_dataset_publication.md) · [G2 correctness review](docs/correctness_review.md) · [Run the local Company Explorer](docs/company_explorer.md) · [Cohort expansion qualification](docs/cohort_expansion.md)
 
-## What the application will do
+## What the application does
 
 | View | What an analyst can do |
 |---|---|
@@ -18,7 +18,7 @@ Filing-to-Funding uses regulatory filings to show how companies' cash, debt, wor
 | Funding scenarios | View 2-, 5-, and 10-year U.S. Treasury par yields and model the effect of a hypothetical rate change on a specified amount of debt. |
 | Filing history and data quality | Review filing dates, conflicts, missing disclosures, and dataset publication status. |
 
-The first release targets **six qualified U.S. industrial companies reporting under U.S. GAAP**, with five complete fiscal years and later published quarters where coverage supports them. Expansion to other regions would require local filing sources and mappings for accounting standards, currencies, and rate benchmarks.
+The first release covers **six qualified U.S. industrial companies reporting under U.S. GAAP**, with five complete fiscal years and later published quarters where coverage supports them. Expansion to other regions would require local filing sources and mappings for accounting standards, currencies, and rate benchmarks.
 
 ## How historical views work
 
@@ -41,7 +41,7 @@ The first release measures reported balance-sheet liquidity and cash generation.
 
 ## Architecture
 
-The planned system takes SEC filing metadata and financial facts alongside Treasury yields. Python jobs preserve source evidence and validate incoming data. PostgreSQL normalizes and versions filing facts, then SQL selects the appropriate historical records and computes comparable metrics. FastAPI serves the results, and Next.js presents the dashboard.
+The application uses SEC filing metadata, financial facts, and Treasury yields. Python jobs preserve source evidence and validate incoming data. PostgreSQL normalizes and versions filing facts, then SQL selects the appropriate historical records and computes comparable metrics. FastAPI serves the results, and Next.js presents the dashboard.
 
 | Layer | v1.2 design |
 |---|---|
@@ -49,7 +49,7 @@ The planned system takes SEC filing metadata and financial facts alongside Treas
 | API | Python and FastAPI with a versioned REST interface and types generated from OpenAPI. |
 | Data | PostgreSQL with `raw`, `core`, and `analytics` schemas. Stage and validate each refresh before publishing a new dataset version. |
 | Local development | Docker and local PostgreSQL. |
-| Planned hosting | Vercel for the web app, Google Cloud Run for the API and ingestion jobs, Cloud Scheduler for refreshes, private Cloud Storage for source payloads, and Supabase for managed PostgreSQL. |
+| Hosting | Vercel for the web app, Google Cloud Run for the API and ingestion jobs, Cloud Scheduler for refreshes, private Cloud Storage for source payloads, and Supabase for managed PostgreSQL. |
 | Delivery | GitHub Actions for automated checks and controlled releases. |
 
 Primary sources are [SEC EDGAR](https://www.sec.gov/search-filings/edgar-application-programming-interfaces) and the [U.S. Treasury daily interest-rate feed](https://home.treasury.gov/treasury-daily-interest-rate-xml-feed). Company Facts supplies standard entity-wide XBRL facts. The source filing and notes provide evidence for custom tags, conflicting contexts, and disclosures that need review.
