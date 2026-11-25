@@ -6,6 +6,8 @@ Filing-to-Funding uses regulatory filings to show how companies' cash, debt, wor
 
 **Live demo.** Explore six qualified U.S. industrial companies in the current dataset, `v0004`. The public app includes filing evidence, historical cutoff views, four published snapshots, and a funding scenario calculator. [Open Filing-to-Funding](https://filing-to-funding.vercel.app/overview) · [Release evidence](docs/performance_and_release_readiness.md#phase-51-production-release)
 
+[Portfolio case study](docs/portfolio_case_study.md) · [Technical evidence](docs/technical_evidence.md) · [Reproduce locally](docs/reproduce_locally.md) · [Three-minute live demo](docs/demo_walkthrough.md) · [CV project entry](docs/cv_project_entry.md)
+
 [v1.2 architecture and audit](docs/filing-to-funding-audit-v1.2.md) · [Pilot company coverage matrix](docs/coverage_matrix.md) · [Pilot filing reconciliation](docs/pilot_reconciliation.md) · [Pilot database model and setup](docs/data_dictionary.md) · [Source register and import](docs/source_register.md) · [Financial methodology and checks](docs/financial_methodology.md) · [Pilot readiness review](docs/pilot_readiness.md) · [Historical SEC backfill](docs/sec_backfill.md) · [Historical accounting qualification](docs/historical_correctness.md) · [Financial ratios](docs/financial_ratios.md) · [Treasury history](docs/treasury_history.md) · [Funding calculator](docs/funding_scenario.md) · [Local dataset publication](docs/local_dataset_publication.md) · [G2 correctness review](docs/correctness_review.md) · [Run the local Company Explorer](docs/company_explorer.md) · [Cohort expansion qualification](docs/cohort_expansion.md)
 
 ## What the application does
